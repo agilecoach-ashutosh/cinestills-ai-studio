@@ -2,53 +2,66 @@
 
 **Change the scene. Keep the person.**
 
-CineStills AI Studio is a local-first desktop photo editing application for prompt-driven edits without Photoshop. The first milestone focuses on background replacement while preserving the subject as much as possible.
+CineStills AI Studio is a local-first desktop photo editing application for prompt-driven edits without Photoshop.
 
-## V0.1 goal
+## V0.1
 
-- Load a local photo
-- Choose a background preset
-- Add an optional custom instruction
-- Generate locally through InvokeAI
-- Compare original vs result
-- Save the edited image
+The first working path is background transformation with strict subject preservation:
+
+1. Load a local photograph.
+2. Choose a background preset.
+3. CineStills sends a resized working copy to your **local** InvokeAI instance.
+4. InvokeAI / SDXL generates the new scene.
+5. A local segmentation model isolates the person.
+6. CineStills composites the **original subject pixels** over the generated background.
+7. Preview and save the result.
+
+This is intentionally different from relying only on a "do not change the face" prompt. In Strict mode, the visible subject comes from the original photograph.
 
 ## Architecture
 
 ```text
-PySide6 Desktop App
+CineStills PySide6 App
       |
       +--> Prompt Recipe Engine
       |
-      +--> Identity Guard / Masking
+      +--> InvokeAI local HTTP API
+      |        |
+      |        +--> SDXL / Juggernaut XL
       |
-      +--> InvokeAI local service
-                 |
-                 +--> SDXL / Juggernaut XL
-                 |
-                 +--> future local models
+      +--> Local Subject Segmentation
+      |
+      +--> Strict Original-Subject Composite
+      |
+      +--> Preview / Save
 ```
-
-## Current status
-
-UI scaffold and local InvokeAI connectivity layer are in place. The next implementation step is wiring an Invoke workflow endpoint for image generation/editing and adding automatic subject masking.
 
 ## Requirements
 
 - Windows 10/11
 - Python 3.12 recommended
 - InvokeAI Community Edition installed and running locally
+- An SDXL main model installed in InvokeAI
 - NVIDIA GPU recommended
 
 ## Windows setup
 
 No terminal commands are required.
 
-1. Run **`setup.cmd`** once. It creates the private Python environment, installs the required components, and starts CineStills.
-2. After the first setup, run **`start.cmd`** whenever you want to open CineStills AI Studio.
-3. Keep InvokeAI running while using local AI generation.
+1. Run **`setup.cmd`** once.
+2. Keep InvokeAI running.
+3. Run **`start.cmd`** to open CineStills AI Studio.
+4. Choose a photo, select a preset and click **Generate Locally**.
 
-If the environment is ever deleted, running `setup.cmd` recreates it automatically.
+If dependencies change, `start.cmd` automatically sends you through `setup.cmd` once.
+
+### First generation note
+
+The subject-segmentation component may download its free model weights on first use. After they are cached, subject masking runs locally.
+
+## Privacy
+
+CineStills does not require an OpenAI or Gemini API key for local mode. The source image, generated image and segmentation work remain on your machine when using local InvokeAI.
 
 ## Project philosophy
 
