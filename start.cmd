@@ -12,6 +12,15 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b %errorlevel%
 )
 
+".venv\Scripts\python.exe" -c "import PySide6, requests, PIL, rembg" >nul 2>&1
+if errorlevel 1 (
+    echo CineStills components have changed.
+    echo Updating the local environment...
+    echo.
+    call setup.cmd
+    exit /b %errorlevel%
+)
+
 ".venv\Scripts\python.exe" main.py
 
 if errorlevel 1 (
