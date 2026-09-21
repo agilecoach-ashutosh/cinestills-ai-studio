@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
-from PySide6.QtCore import Qt
+from PIL import Image
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -21,6 +22,7 @@ from app.config import CONFIG
 from app.recipes import RECIPES
 from app.services.invoke_client import InvokeClient
 from app.widgets.image_panel import ImagePanel
+from app.workers.generation_worker import GenerationWorker
 
 
 class MainWindow(QMainWindow):
@@ -31,6 +33,8 @@ class MainWindow(QMainWindow):
 
         self.invoke = InvokeClient()
         self.source_path: str | None = None
+        self.result_path: str | None = None
+        self.worker: GenerationWorker | None = None
 
         root = QWidget()
         self.setCentralWidget(root)
@@ -43,7 +47,7 @@ class MainWindow(QMainWindow):
         brand.setObjectName("brand")
         tagline = QLabel("Change the scene. Keep the person.")
         tagline.setObjectName("tagline")
-        self.connection = QLabel("InvokeAI: checking…")
+        self.connection = QLabel("InvokeAI: checking...")
         self.connection.setObjectName("connection")
         header.addWidget(brand)
         header.addWidget(tagline)
@@ -52,8 +56,8 @@ class MainWindow(QMainWindow):
         outer.addLayout(header)
 
         images = QHBoxLayout()
-        self.original = ImagePanel("ORIGINAL", "Drop support comes next.\nUse Choose Photo for V0.1.")
-        self.preview = ImagePanel("PREVIEW", "Your generated result will appear here.")
+        self.original = ImagePanel("ORIGINAL", "Choose a photo to begin.")
+        self.preview = ImagePanel("PREVIEW", "Your edited result will appear here.")
         images.addWidget(self.original, 1)
         images.addWidget(self.preview, 1)
         outer.addLayout(images, 1)
@@ -84,23 +88,28 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.custom_prompt)
 
         actions = QHBoxLayout()
+        self.status = QLabel("Ready")
+        self.status.setObjectName("status")
+
         self.generate = QPushButton("Generate Locally")
         self.generate.setObjectName("generateButton")
         self.generate.clicked.connect(self.generate_local)
 
-        save = QPushButton("Save As")
-        save.clicked.connect(self.save_result)
+        self.save = QPushButton("Save As")
+        self.save.setEnabled(False)
+        self.save.clicked.connect(self.save_result)
 
+        actions.addWidget(self.status)
         actions.addStretch(1)
         actions.addWidget(self.generate)
-        actions.addWidget(save)
+        actions.addWidget(self.save)
         outer.addLayout(actions)
 
         self.setStyleSheet(
             """
             QMainWindow, QWidget { background: #101217; color: #F4F5F7; font-size: 14px; }
             #brand { font-size: 24px; font-weight: 700; }
-            #tagline { color: #AAB0BC; margin-left: 14px; }
+            #tagline, #status { color: #AAB0BC; margin-left: 14px; }
             #connection { color: #AAB0BC; }
             #panelTitle { font-weight: 700; color: #DCE1E8; }
             #imageWell {
@@ -116,12 +125,14 @@ class MainWindow(QMainWindow):
                 padding: 9px 12px;
             }
             QPushButton:hover { border-color: #737D91; }
+            QPushButton:disabled { color: #6E7480; background: #171A21; }
             #generateButton {
                 background: #D7FF00;
                 color: #101217;
                 font-weight: 800;
                 padding: 12px 22px;
             }
+            #generateButton:disabled { background: #687500; color: #B7BF8A; }
             #identity {
                 background: #14251E;
                 color: #80F0B2;
@@ -155,16 +166,20 @@ class MainWindow(QMainWindow):
         if not path:
             return
         self.source_path = path
+        self.result_path = None
         self.original.set_image(path)
         self.preview.clear_image("Ready for local edit.")
+        self.save.setEnabled(False)
+        self.status.setText("Ready")
 
     def build_prompt(self) -> str:
         recipe = RECIPES[self.recipe.currentIndex()]
         custom = self.custom_prompt.toPlainText().strip()
         identity_guard = (
-            "Identity preservation is strict. Do not alter facial geometry, eyes, nose, "
-            "mouth, jawline, skin tone, hairstyle, body proportions, or identifying "
-            "features. Modify only the requested scene elements."
+            "Use the supplied photograph as the composition reference. Keep one person only. "
+            "Preserve the subject's pose, silhouette, camera angle and position. "
+            "Concentrate the visual change on the background and surrounding environment. "
+            "Do not add people behind or beside the subject."
         )
         parts = [identity_guard, recipe.prompt]
         if custom:
@@ -185,29 +200,65 @@ class MainWindow(QMainWindow):
             )
             return
 
-        prompt = self.build_prompt()
-        QMessageBox.information(
+        self.generate.setEnabled(False)
+        self.save.setEnabled(False)
+        self.preview.clear_image("Generating locally...")
+        self.status.setText("Starting local generation...")
+
+        self.worker = GenerationWorker(
+            source_path=self.source_path,
+            prompt=self.build_prompt(),
+            base_url=self.invoke.base_url,
+        )
+        self.worker.status.connect(self.status.setText)
+        self.worker.succeeded.connect(self.generation_succeeded)
+        self.worker.failed.connect(self.generation_failed)
+        self.worker.finished.connect(lambda: self.generate.setEnabled(True))
+        self.worker.start()
+
+    def generation_succeeded(self, path: str) -> None:
+        self.result_path = path
+        self.preview.set_image(path)
+        self.save.setEnabled(True)
+        self.status.setText("Done. Subject pixels preserved from the original photo.")
+
+    def generation_failed(self, message: str) -> None:
+        self.result_path = None
+        self.preview.clear_image("Generation failed.")
+        self.status.setText("Generation failed")
+        QMessageBox.critical(
             self,
-            "Local engine connected",
-            "The CineStills UI and InvokeAI connection are working.\n\n"
-            "The next implementation step is wiring the exact Invoke workflow endpoint "
-            "for masked background editing.\n\nPrompt prepared:\n\n"
-            + prompt[:900],
+            "Local generation failed",
+            message
+            + "\n\nIf dependencies were just updated, close CineStills and run setup.cmd once.",
         )
 
     def save_result(self) -> None:
-        if not self.preview._pixmap:
+        if not self.result_path:
             QMessageBox.information(self, "Nothing to save", "Generate an edited image first.")
             return
 
-        destination, _ = QFileDialog.getSaveFileName(
+        destination, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Save Edited Photo",
             str(Path.home() / "cinestills-result.png"),
-            "PNG Image (*.png);;JPEG Image (*.jpg)",
+            "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg)",
         )
-        if destination:
-            self.preview._pixmap.save(destination)
+        if not destination:
+            return
+
+        suffix = Path(destination).suffix.lower()
+        if suffix in {".jpg", ".jpeg"} or "JPEG" in selected_filter:
+            if suffix not in {".jpg", ".jpeg"}:
+                destination += ".jpg"
+            with Image.open(self.result_path) as image:
+                image.convert("RGB").save(destination, quality=95)
+        else:
+            if not suffix:
+                destination += ".png"
+            shutil.copy2(self.result_path, destination)
+
+        self.status.setText(f"Saved: {destination}")
 
 
 def run_app() -> None:
