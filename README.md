@@ -39,16 +39,16 @@ UI scaffold and local InvokeAI connectivity layer are in place. The next impleme
 - Python 3.12 recommended
 - InvokeAI Community Edition installed and running locally
 - NVIDIA GPU recommended
-- PySide6
 
-## Run
+## Windows setup
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
-```
+No terminal commands are required.
+
+1. Run **`setup.cmd`** once. It creates the private Python environment, installs the required components, and starts CineStills.
+2. After the first setup, run **`start.cmd`** whenever you want to open CineStills AI Studio.
+3. Keep InvokeAI running while using local AI generation.
+
+If the environment is ever deleted, running `setup.cmd` recreates it automatically.
 
 ## Project philosophy
 
