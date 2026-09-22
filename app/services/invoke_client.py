@@ -49,6 +49,19 @@ class InvokeClient:
 
         return InvokeHealth(False, last_error)
 
+    def health_quick(self, timeout: float = 0.8) -> InvokeHealth:
+        """Fast UI heartbeat that avoids freezing the desktop when InvokeAI is down."""
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/v1/app/version",
+                timeout=timeout,
+            )
+            if response.status_code < 500:
+                return InvokeHealth(True, f"Connected to {self.base_url}")
+            return InvokeHealth(False, f"HTTP {response.status_code} from /api/v1/app/version")
+        except requests.RequestException as exc:
+            return InvokeHealth(False, str(exc))
+
     def list_models(self) -> list[dict]:
         response = requests.get(
             f"{self.base_url}/api/v2/models/",
