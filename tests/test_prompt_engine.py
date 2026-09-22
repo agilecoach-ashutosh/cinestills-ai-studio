@@ -1,7 +1,13 @@
 import unittest
 
-from app.presets import PRESETS, StudioPreset, presets_for
-from app.prompt_engine import LookSettings, SubjectLocks, build_prompt
+from app.presets import PRESETS, StudioPreset, modes, presets_for
+from app.prompt_engine import (
+    LookSettings,
+    PROTECTED_START,
+    SubjectLocks,
+    build_prompt,
+    finalize_prompt,
+)
 
 
 class PromptEngineTests(unittest.TestCase):
@@ -33,6 +39,37 @@ class PromptEngineTests(unittest.TestCase):
         self.assertTrue(presets_for("Dress & Fabric"))
         self.assertTrue(presets_for("Retouch"))
         self.assertTrue(presets_for("Interior"))
+
+    def test_public_catalog_is_portrait_focused(self):
+        self.assertEqual(
+            modes(),
+            [
+                "Change Background",
+                "Complete Redesign",
+                "Change Outfit",
+                "Lighting & Mood",
+                "Professional Portrait",
+                "Professional Skin Retouching",
+                "Enhance & Restore",
+            ],
+        )
+        self.assertTrue(presets_for("Complete Redesign"))
+        self.assertTrue(presets_for("Professional Skin Retouching"))
+
+    def test_keyword_becomes_context_aware_background_direction(self):
+        preset = presets_for("Change Background")[0]
+        prompt = build_prompt(preset, keyword="Kashmir")
+        self.assertIn("Kashmir", prompt)
+        self.assertIn("light direction", prompt)
+        self.assertIn("depth of field", prompt)
+
+    def test_user_edits_survive_while_identity_guard_is_rebuilt(self):
+        preset = presets_for("Complete Redesign")[0]
+        edited = "My own final creative direction without the generated guard."
+        final = finalize_prompt(edited, preset)
+        self.assertIn(edited, final)
+        self.assertIn(PROTECTED_START, final)
+        self.assertIn("same recognisable person", final)
 
 
 if __name__ == "__main__":

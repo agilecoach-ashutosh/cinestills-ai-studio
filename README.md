@@ -1,152 +1,131 @@
 # CineStills AI Studio
 
-**Change the scene. Keep the person.**
+**Upload a portrait. Choose a look. Keep the person.**
 
-CineStills AI Studio is a local-first desktop photo editing application for photographers and creators who want practical AI-assisted edits without depending on paid cloud APIs.
+CineStills AI Studio is a local-first portrait transformation application for photographers and everyday users. A user can upload one photograph, choose what they want to change, browse curated visual themes and generate an editable photography prompt without learning prompt engineering.
 
-## V0.3 Studio
+## V0.4 Portrait Studio
 
-V0.3 turns the structured studio into a more practical local photo editor with **Magic Brush** masked editing and a substantially expanded preset library.
+V0.4 replaces the earlier tool-heavy workflow with an action-first portrait studio.
 
-### Edit modes
+### Main transformations
 
-- **Background** — studio paper, low-key, indoor, outdoor, cinematic, kids and birthday scenes
-- **Creative** — moon scenes, magical forests, reflections and atmospheric transformations
-- **Dress & Fabric** — gown extension, flare and fabric-shape edits
-- **Retouch** — targeted prompt recipes such as hair-edge cleanup and dress wrinkle cleanup
-- **Add / Remove** — props and atmosphere such as flower arches and fog
-- **Product** — clean and dramatic product-studio recipes
+1. **Change Background** — studio, indoor, outdoor, cinematic, celebrations and more
+2. **Complete Redesign** — retro, Indian heritage, cinematic, festival, fashion and fantasy looks
+3. **Change Outfit** — professional, traditional, fashion and everyday wardrobe
+4. **Lighting & Mood** — natural, studio and creative relighting
+5. **Professional Portrait** — LinkedIn, executive, actor, studio and fashion outcomes
+6. **Professional Skin Retouching** — natural, polished, editorial and targeted corrections
+7. **Enhance & Restore** — clarity, low-light rescue, old-photo repair and colourisation
 
-### Subject Lock
+The V0.4 catalogue contains 76 visible themes arranged into clear collections. Older product and interior recipes remain in the source catalogue but no longer compete for attention in the main portrait workflow.
 
-CineStills now exposes reusable preservation controls for:
+## User workflow
 
-- face / identity
-- hair
-- body proportions
-- pose and subject position
-- clothing
-- skin tone
+1. Upload a portrait.
+2. Choose what to change.
+3. Browse or search the theme gallery.
+4. Add an optional idea such as `Kashmir`, `Diwali` or `Paris café`.
+5. Adjust transformation strength, light or colour.
+6. Review and optionally edit the generated final prompt.
+7. Generate locally through InvokeAI.
+8. Compare and save the result.
 
-The generated prompt is visible in the app so photographers can see exactly what will be sent to the local engine.
+## No-prompt and editable-prompt modes
 
-### Cinematic Look
+CineStills creates a full photography instruction from the selected theme and simple controls. A single keyword is expanded with scene integration guidance for perspective, light direction, colour temperature, depth of field and contact shadows.
 
-Reusable photographic controls can be layered over any preset:
+The generated prompt remains editable. Users can:
 
-- 35mm / 50mm / 85mm lens look
-- golden hour, diffused, backlit and low-key lighting
-- shallow or deep focus
-- warm film, muted editorial, teal-orange and cool grading
-- fine film grain or high-dynamic-range treatment
+- rewrite any creative direction
+- regenerate from the selected controls
+- return to the previous prompt
+- copy the final prompt
+- save the prompt as a personal preset
 
-## Preservation modes
+At generation time, CineStills rebuilds a protected Identity Lock block. This prevents an accidental prompt edit from silently removing the selected face, body, pose, clothing or skin-tone protections.
 
-CineStills intentionally uses two different preservation strategies.
+## Identity-preservation strategies
 
-### Strict subject preservation
+CineStills uses different protection strategies because different edits affect different pixels.
 
-Background and scene presets use the original V0.1 pipeline:
+### Strict Identity Lock
 
-1. Load the source photograph.
-2. Generate a new scene locally with InvokeAI / SDXL.
-3. Segment the original subject locally.
-4. Composite the **original subject pixels** over the generated scene.
-5. Preview and save.
+Background transformations generate the new scene and then composite the original subject pixels over it. The original face and person are not regenerated.
 
-This is stronger than merely prompting the model not to change the face.
+### Reference Identity Lock
 
-### Generative identity preservation
+Complete redesign, outfit, lighting and professional portrait modes use the source photograph as the image-to-image reference with strong identity instructions and conservative transformation strength controls.
 
-Dress, hair, product and other edits that must change subject pixels cannot use strict compositing because doing so would paste the old pixels back over the requested edit.
+### Painted edit area
 
-Those recipes therefore use prompt-based identity constraints while allowing the requested area to change.
+Outfit and professional skin-retouching themes recommend painting the exact area allowed to change. Pixels outside that area are restored locally after generation. This is the safest current workflow for clothing and targeted skin corrections.
 
-### Magic Brush masked editing
+Professional retouching is intentionally conservative: it protects pores, natural complexion, permanent features and facial structure while addressing temporary blemishes, shine or under-eye darkness.
 
-V0.3 adds a local brush/mask workflow for targeted edits:
+## Privacy and processing
 
-1. Choose **Paint Edit Area**.
-2. Paint the region AI is allowed to change.
-3. Select a retouch, wardrobe, prop, product or other recipe.
-4. Generate locally.
-5. CineStills restores the original pixels everywhere outside the painted region.
-
-The mask is composited locally after generation, so this feature does not depend on a separate cloud service or a model-specific masking endpoint.
-
-## Architecture
-
-```text
-CineStills PySide6 App
-      |
-      +--> Structured Preset Library
-      |
-      +--> Prompt Composer
-      |        |
-      |        +--> Subject Locks
-      |        +--> Cinematic Look
-      |
-      +--> InvokeAI local HTTP API
-      |        |
-      |        +--> SDXL / Juggernaut XL
-      |
-      +--> Local Subject Segmentation
-      |
-      +--> Magic Brush Mask Composite
-      |
-      +--> Strict Composite when the edit allows it
-      |
-      +--> Preview / Save
-```
-
-## Requirements
-
-- Windows 10/11
-- Python 3.12 recommended
-- InvokeAI Community Edition installed and running locally
-- An SDXL main model installed in InvokeAI
-- NVIDIA GPU recommended
+- Local InvokeAI processing by default
+- No OpenAI or Gemini API key required
+- Local segmentation and mask compositing
+- Source and output photographs remain on the user's computer in local mode
+- Personal prompt presets are stored locally in `.cinestills/personal-presets.json`
 
 ## Windows setup
 
 No terminal commands are required.
 
 1. Run **`setup.cmd`** once.
-2. Keep InvokeAI running.
-3. Run **`start.cmd`** to open CineStills AI Studio.
-4. Choose a photo.
-5. Select **Mode → Category → Preset**.
-6. For targeted edits, click **Paint Edit Area** and brush over the exact region to change.
-7. Adjust Subject Lock and Cinematic Look controls if needed.
-8. Click **Generate Locally**.
-9. Save the result.
+2. Keep InvokeAI running locally.
+3. Run **`start.cmd`**.
+4. Upload a portrait and choose a look.
 
-If dependencies change, `start.cmd` automatically sends you through `setup.cmd` once.
+If dependencies change, `start.cmd` routes back through setup automatically.
 
-### First generation note
+## Requirements
 
-The subject-segmentation component may download its free model weights on first use. After they are cached, subject masking runs locally.
+- Windows 10/11
+- Python 3.12 recommended
+- InvokeAI Community Edition running locally
+- An SDXL main model installed in InvokeAI
+- NVIDIA GPU recommended
 
-## Prompt-library design
+## Current quality boundary
 
-Presets are stored as structured recipes rather than one giant collection of pasted prompts. Each recipe contains:
+Strict background replacement can retain the original person pixel-for-pixel. Generative full redesigns cannot honestly guarantee mathematically identical facial pixels with the current SDXL image-to-image pipeline. V0.4 reduces drift through the source reference, conservative strength and protected identity instructions. Stronger face-reference conditioning and automated face-similarity validation remain the next technical quality layer.
 
-- editing mode
-- category
-- scene/edit instruction
-- preservation strategy
-- searchable tags
+## Architecture
 
-This makes the studio library easier to expand with additional maternity, pre-wedding, kids, portrait, product and commercial packs.
+```text
+Portrait upload
+      |
+      +--> Transformation category
+      |        |
+      |        +--> Searchable theme catalogue
+      |        +--> Keyword expansion
+      |        +--> Simple photographic controls
+      |
+      +--> Editable prompt
+      |        |
+      |        +--> Protected Identity Lock
+      |
+      +--> InvokeAI / SDXL local generation
+      |        |
+      |        +--> Optional painted-area composite
+      |        +--> Strict subject composite for backgrounds
+      |
+      +--> Compare and save
+```
 
-## Privacy
+## Next quality milestones
 
-CineStills does not require an OpenAI or Gemini API key for local mode. The source image, generated image and segmentation work remain on your machine when using local InvokeAI.
-
-## Roadmap
-
-Next high-value layers include reusable saved recipes/favorites, richer before/after comparison, batch processing and stronger reference-based identity conditioning for full restyles.
+- Original photographic preview artwork for every theme card
+- Native InvokeAI inpainting instead of output-only mask compositing
+- Face-reference conditioning for major restyles
+- Automated identity-similarity checks and retry
+- Four-result contact sheet and before/after slider
+- Favourites and full personal-preset gallery
 
 ## Project philosophy
 
-Local-first by default. Cloud providers may be added later as optional adapters, but the core product should remain useful without paid API usage.
+Prompting should be optional. Creative control should not be.

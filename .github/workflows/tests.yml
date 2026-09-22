@@ -19,11 +19,32 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install test dependency
-        run: python -m pip install Pillow
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Install Qt runtime library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
 
       - name: Compile Python sources
         run: python -m compileall -q app main.py
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
+
+      - name: Smoke test desktop window
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python - <<'PY'
+          from PySide6.QtWidgets import QApplication
+          from app.main_window import MainWindow
+
+          app = QApplication([])
+          window = MainWindow()
+          assert window.windowTitle().startswith("CineStills AI Studio")
+          assert window.current_preset() is not None
+          window.close()
+          app.quit()
+          PY

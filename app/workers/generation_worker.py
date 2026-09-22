@@ -24,6 +24,7 @@ class GenerationWorker(QThread):
         base_url: str,
         strict_composite: bool = True,
         edit_mask_path: str | None = None,
+        strength: float = 0.72,
     ) -> None:
         super().__init__()
         self.source_path = source_path
@@ -31,6 +32,7 @@ class GenerationWorker(QThread):
         self.base_url = base_url
         self.strict_composite = strict_composite
         self.edit_mask_path = edit_mask_path
+        self.strength = strength
 
     def run(self) -> None:
         try:
@@ -54,6 +56,7 @@ class GenerationWorker(QThread):
                 prompt=self.prompt,
                 width=width,
                 height=height,
+                strength=self.strength,
             )
 
             original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
