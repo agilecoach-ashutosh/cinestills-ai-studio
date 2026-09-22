@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
+from app.services.image_io import load_oriented_image
 
 
 class ImagePanel(QWidget):
@@ -25,7 +25,16 @@ class ImagePanel(QWidget):
         layout.addWidget(self.image, 1)
 
     def set_image(self, path: str) -> None:
-        pixmap = QPixmap(str(Path(path)))
+        oriented = load_oriented_image(path)
+        raw = oriented.tobytes("raw", "RGBA")
+        qimage = QImage(
+            raw,
+            oriented.width,
+            oriented.height,
+            oriented.width * 4,
+            QImage.Format.Format_RGBA8888,
+        ).copy()
+        pixmap = QPixmap.fromImage(qimage)
         if pixmap.isNull():
             return
         self._pixmap = pixmap

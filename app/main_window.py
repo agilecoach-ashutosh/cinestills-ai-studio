@@ -5,7 +5,7 @@ import shutil
 import time
 
 from PIL import Image
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -202,6 +202,11 @@ class MainWindow(QMainWindow):
 
         self._populate_modes()
         self.check_invoke()
+
+        self.connection_timer = QTimer(self)
+        self.connection_timer.setInterval(5000)
+        self.connection_timer.timeout.connect(self.check_invoke)
+        self.connection_timer.start()
 
     def _build_left_panel(self) -> QWidget:
         frame = QFrame()
@@ -441,15 +446,19 @@ class MainWindow(QMainWindow):
         if hasattr(self, "prompt_preview"):
             self.prompt_preview.setPlainText(self.build_current_prompt())
 
-    def check_invoke(self) -> None:
-        health = self.invoke.health()
-        if health.ok:
-            self.connection.setText("InvokeAI: Connected")
+    def _apply_connection_status(self, ok: bool, detail: str) -> None:
+        if ok:
+            self.connection.setText("● InvokeAI Connected")
+            self.connection.setToolTip(detail)
             self.connection.setStyleSheet("color: #80F0B2;")
         else:
-            self.connection.setText("InvokeAI: Offline")
-            self.connection.setToolTip(health.detail)
+            self.connection.setText("● InvokeAI Offline")
+            self.connection.setToolTip(detail)
             self.connection.setStyleSheet("color: #FF9A9A;")
+
+    def check_invoke(self) -> None:
+        health = self.invoke.health_quick()
+        self._apply_connection_status(health.ok, health.detail)
 
     def choose_photo(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -526,6 +535,7 @@ class MainWindow(QMainWindow):
             return
 
         health = self.invoke.health()
+        self._apply_connection_status(health.ok, health.detail)
         if not health.ok:
             QMessageBox.warning(
                 self,
@@ -558,6 +568,8 @@ class MainWindow(QMainWindow):
         self.save.setEnabled(True)
 
         preset = self.current_preset()
+        self.check_invoke()
+
         if self.mask_path and preset and preset.strict_composite:
             self.status.setText("Done. Magic Brush edit applied with strict subject preservation.")
         elif self.mask_path:
@@ -571,6 +583,7 @@ class MainWindow(QMainWindow):
         self.result_path = None
         self.preview.clear_image("Generation failed.")
         self.status.setText("Generation failed")
+        self.check_invoke()
         QMessageBox.critical(
             self,
             "Local generation failed",
