@@ -4,9 +4,9 @@
 
 CineStills AI Studio is a local-first desktop photo editing application for photographers and creators who want practical AI-assisted edits without depending on paid cloud APIs.
 
-## V0.2 Studio
+## V0.3 Studio
 
-V0.2 turns the original single-preset prototype into a structured editing studio.
+V0.3 turns the structured studio into a more practical local photo editor with **Magic Brush** masked editing and a substantially expanded preset library.
 
 ### Edit modes
 
@@ -62,7 +62,17 @@ Dress, hair, product and other edits that must change subject pixels cannot use 
 
 Those recipes therefore use prompt-based identity constraints while allowing the requested area to change.
 
-> Current limitation: V0.2 does not yet provide a brush/mask editor. Generative retouch and wardrobe edits operate through the local image-to-image workflow and may affect more of the image than a future masked workflow will.
+### Magic Brush masked editing
+
+V0.3 adds a local brush/mask workflow for targeted edits:
+
+1. Choose **Paint Edit Area**.
+2. Paint the region AI is allowed to change.
+3. Select a retouch, wardrobe, prop, product or other recipe.
+4. Generate locally.
+5. CineStills restores the original pixels everywhere outside the painted region.
+
+The mask is composited locally after generation, so this feature does not depend on a separate cloud service or a model-specific masking endpoint.
 
 ## Architecture
 
@@ -81,6 +91,8 @@ CineStills PySide6 App
       |        +--> SDXL / Juggernaut XL
       |
       +--> Local Subject Segmentation
+      |
+      +--> Magic Brush Mask Composite
       |
       +--> Strict Composite when the edit allows it
       |
@@ -104,9 +116,10 @@ No terminal commands are required.
 3. Run **`start.cmd`** to open CineStills AI Studio.
 4. Choose a photo.
 5. Select **Mode → Category → Preset**.
-6. Adjust Subject Lock and Cinematic Look controls if needed.
-7. Click **Generate Locally**.
-8. Save the result.
+6. For targeted edits, click **Paint Edit Area** and brush over the exact region to change.
+7. Adjust Subject Lock and Cinematic Look controls if needed.
+8. Click **Generate Locally**.
+9. Save the result.
 
 If dependencies change, `start.cmd` automatically sends you through `setup.cmd` once.
 
@@ -132,7 +145,7 @@ CineStills does not require an OpenAI or Gemini API key for local mode. The sour
 
 ## Roadmap
 
-The next high-value editing layer is a local **Magic Brush / mask editor** so users can paint the exact region for hair cleanup, garment extension, prop insertion or object removal before generation.
+Next high-value layers include reusable saved recipes/favorites, richer before/after comparison, batch processing and stronger reference-based identity conditioning for full restyles.
 
 ## Project philosophy
 
