@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+import time
 
 from PIL import Image
 from PySide6.QtCore import Qt
@@ -30,6 +31,7 @@ from app.presets import categories_for_mode, modes, presets_for, StudioPreset
 from app.prompt_engine import LookSettings, SubjectLocks, build_prompt
 from app.services.invoke_client import InvokeClient
 from app.widgets.image_panel import ImagePanel
+from app.widgets.mask_editor import MaskEditorDialog
 from app.workers.generation_worker import GenerationWorker
 
 
@@ -42,6 +44,7 @@ class MainWindow(QMainWindow):
         self.invoke = InvokeClient()
         self.source_path: str | None = None
         self.result_path: str | None = None
+        self.mask_path: str | None = None
         self.worker: GenerationWorker | None = None
         self.visible_presets: list[StudioPreset] = []
 
@@ -153,6 +156,21 @@ class MainWindow(QMainWindow):
                 padding: 8px 10px;
                 font-weight: 800;
             }
+            #maskActive {
+                background: #24172B;
+                color: #F2A7FF;
+                border: 1px solid #623A70;
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-weight: 800;
+            }
+            #maskInactive {
+                background: #171A21;
+                color: #8D96A5;
+                border: 1px solid #343B49;
+                border-radius: 8px;
+                padding: 8px 10px;
+            }
             QCheckBox { spacing: 7px; }
             QScrollArea { border: none; background: transparent; }
             QFrame#sidePanel {
@@ -226,6 +244,24 @@ class MainWindow(QMainWindow):
         self.custom_prompt.setMaximumHeight(105)
         layout.addWidget(QLabel("Extra instruction"))
         layout.addWidget(self.custom_prompt)
+
+        mask_title = QLabel("MAGIC BRUSH")
+        mask_title.setObjectName("sectionTitle")
+        layout.addWidget(mask_title)
+
+        mask_actions = QHBoxLayout()
+        paint_mask = QPushButton("Paint Edit Area")
+        paint_mask.clicked.connect(self.edit_mask)
+        clear_mask = QPushButton("Clear")
+        clear_mask.clicked.connect(self.clear_edit_mask)
+        mask_actions.addWidget(paint_mask, 1)
+        mask_actions.addWidget(clear_mask)
+        layout.addLayout(mask_actions)
+
+        self.mask_badge = QLabel("No mask · generation can affect the full image")
+        self.mask_badge.setWordWrap(True)
+        self.mask_badge.setObjectName("maskInactive")
+        layout.addWidget(self.mask_badge)
 
         layout.addStretch(1)
         return frame
@@ -427,10 +463,57 @@ class MainWindow(QMainWindow):
 
         self.source_path = path
         self.result_path = None
+        self.mask_path = None
+        self._update_mask_badge()
         self.original.set_image(path)
         self.preview.clear_image("Ready for local edit.")
         self.save.setEnabled(False)
         self.status.setText("Ready")
+
+    def edit_mask(self) -> None:
+        if not self.source_path:
+            QMessageBox.information(self, "Choose a photo", "Select a source photo first.")
+            return
+
+        dialog = MaskEditorDialog(self.source_path, self)
+        if not dialog.exec():
+            return
+
+        if not dialog.has_selection():
+            QMessageBox.information(
+                self,
+                "No edit area selected",
+                "Paint at least one area before saving the Magic Brush mask.",
+            )
+            return
+
+        mask_dir = Path.cwd() / "temp" / "masks"
+        mask_dir.mkdir(parents=True, exist_ok=True)
+        mask_path = mask_dir / f"cinestills-mask-{int(time.time() * 1000)}.png"
+        if not dialog.save_mask(mask_path):
+            QMessageBox.warning(self, "Mask not saved", "CineStills could not save the edit mask.")
+            return
+
+        self.mask_path = str(mask_path)
+        self._update_mask_badge()
+        self.status.setText("Magic Brush active · only the painted area may change.")
+
+    def clear_edit_mask(self) -> None:
+        self.mask_path = None
+        self._update_mask_badge()
+        self.status.setText("Magic Brush cleared.")
+
+    def _update_mask_badge(self) -> None:
+        if not hasattr(self, "mask_badge"):
+            return
+        if self.mask_path:
+            self.mask_badge.setText("MAGIC BRUSH ACTIVE\nOnly the painted area may change.")
+            self.mask_badge.setObjectName("maskActive")
+        else:
+            self.mask_badge.setText("No mask · generation can affect the full image")
+            self.mask_badge.setObjectName("maskInactive")
+        self.mask_badge.style().unpolish(self.mask_badge)
+        self.mask_badge.style().polish(self.mask_badge)
 
     def generate_local(self) -> None:
         if not self.source_path:
@@ -461,6 +544,7 @@ class MainWindow(QMainWindow):
             prompt=self.build_current_prompt(),
             base_url=self.invoke.base_url,
             strict_composite=preset.strict_composite,
+            edit_mask_path=self.mask_path,
         )
         self.worker.status.connect(self.status.setText)
         self.worker.succeeded.connect(self.generation_succeeded)
@@ -474,7 +558,11 @@ class MainWindow(QMainWindow):
         self.save.setEnabled(True)
 
         preset = self.current_preset()
-        if preset and preset.strict_composite:
+        if self.mask_path and preset and preset.strict_composite:
+            self.status.setText("Done. Magic Brush edit applied with strict subject preservation.")
+        elif self.mask_path:
+            self.status.setText("Done. Magic Brush edit applied only inside the painted area.")
+        elif preset and preset.strict_composite:
             self.status.setText("Done. Original subject pixels preserved.")
         else:
             self.status.setText("Done. Generative edit completed.")

@@ -7,8 +7,9 @@ import time
 from PIL import Image, ImageOps
 from PySide6.QtCore import QThread, Signal
 
-from app.services.identity_guard import prepare_working_image, preserve_original_subject
+from app.services.identity_guard import create_subject_mask, prepare_working_image
 from app.services.invoke_client import InvokeClient
+from app.services.mask_ops import apply_edit_mask
 
 
 class GenerationWorker(QThread):
@@ -22,12 +23,14 @@ class GenerationWorker(QThread):
         prompt: str,
         base_url: str,
         strict_composite: bool = True,
+        edit_mask_path: str | None = None,
     ) -> None:
         super().__init__()
         self.source_path = source_path
         self.prompt = prompt
         self.base_url = base_url
         self.strict_composite = strict_composite
+        self.edit_mask_path = edit_mask_path
 
     def run(self) -> None:
         try:
@@ -53,21 +56,26 @@ class GenerationWorker(QThread):
                 height=height,
             )
 
-            if self.strict_composite:
-                self.status.emit("Applying strict subject preservation...")
-                final_path = preserve_original_subject(
+            original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
+
+            if self.edit_mask_path:
+                self.status.emit("Applying Magic Brush selection...")
+                edited = apply_edit_mask(
                     source_path=self.source_path,
                     generated_bytes=generated_bytes,
-                    destination=output_path,
+                    mask_path=self.edit_mask_path,
                 )
             else:
-                self.status.emit("Finalizing generative edit...")
-                original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
-                generated = Image.open(BytesIO(generated_bytes)).convert("RGB")
-                generated = generated.resize(original.size, Image.Resampling.LANCZOS)
-                generated.save(output_path, "PNG")
-                final_path = str(output_path)
+                edited = Image.open(BytesIO(generated_bytes)).convert("RGB")
+                edited = edited.resize(original.size, Image.Resampling.LANCZOS)
 
-            self.succeeded.emit(final_path)
+            if self.strict_composite:
+                self.status.emit("Applying strict subject preservation...")
+                subject_mask = create_subject_mask(original)
+                edited = Image.composite(original, edited, subject_mask)
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            edited.save(output_path, "PNG")
+            self.succeeded.emit(str(output_path))
         except Exception as exc:
             self.failed.emit(str(exc))
