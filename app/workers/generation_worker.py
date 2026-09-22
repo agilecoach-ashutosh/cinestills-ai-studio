@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 import time
 
+from PIL import Image, ImageOps
 from PySide6.QtCore import QThread, Signal
 
 from app.services.identity_guard import prepare_working_image, preserve_original_subject
@@ -14,11 +16,18 @@ class GenerationWorker(QThread):
     succeeded = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, source_path: str, prompt: str, base_url: str) -> None:
+    def __init__(
+        self,
+        source_path: str,
+        prompt: str,
+        base_url: str,
+        strict_composite: bool = True,
+    ) -> None:
         super().__init__()
         self.source_path = source_path
         self.prompt = prompt
         self.base_url = base_url
+        self.strict_composite = strict_composite
 
     def run(self) -> None:
         try:
@@ -44,12 +53,20 @@ class GenerationWorker(QThread):
                 height=height,
             )
 
-            self.status.emit("Applying Identity Protection...")
-            final_path = preserve_original_subject(
-                source_path=self.source_path,
-                generated_bytes=generated_bytes,
-                destination=output_path,
-            )
+            if self.strict_composite:
+                self.status.emit("Applying strict subject preservation...")
+                final_path = preserve_original_subject(
+                    source_path=self.source_path,
+                    generated_bytes=generated_bytes,
+                    destination=output_path,
+                )
+            else:
+                self.status.emit("Finalizing generative edit...")
+                original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
+                generated = Image.open(BytesIO(generated_bytes)).convert("RGB")
+                generated = generated.resize(original.size, Image.Resampling.LANCZOS)
+                generated.save(output_path, "PNG")
+                final_path = str(output_path)
 
             self.succeeded.emit(final_path)
         except Exception as exc:

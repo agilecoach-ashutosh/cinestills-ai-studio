@@ -2,28 +2,79 @@
 
 **Change the scene. Keep the person.**
 
-CineStills AI Studio is a local-first desktop photo editing application for prompt-driven edits without Photoshop.
+CineStills AI Studio is a local-first desktop photo editing application for photographers and creators who want practical AI-assisted edits without depending on paid cloud APIs.
 
-## V0.1
+## V0.2 Studio
 
-The first working path is background transformation with strict subject preservation:
+V0.2 turns the original single-preset prototype into a structured editing studio.
 
-1. Load a local photograph.
-2. Choose a background preset.
-3. CineStills sends a resized working copy to your **local** InvokeAI instance.
-4. InvokeAI / SDXL generates the new scene.
-5. A local segmentation model isolates the person.
-6. CineStills composites the **original subject pixels** over the generated background.
-7. Preview and save the result.
+### Edit modes
 
-This is intentionally different from relying only on a "do not change the face" prompt. In Strict mode, the visible subject comes from the original photograph.
+- **Background** — studio paper, low-key, indoor, outdoor, cinematic, kids and birthday scenes
+- **Creative** — moon scenes, magical forests, reflections and atmospheric transformations
+- **Dress & Fabric** — gown extension, flare and fabric-shape edits
+- **Retouch** — targeted prompt recipes such as hair-edge cleanup and dress wrinkle cleanup
+- **Add / Remove** — props and atmosphere such as flower arches and fog
+- **Product** — clean and dramatic product-studio recipes
+
+### Subject Lock
+
+CineStills now exposes reusable preservation controls for:
+
+- face / identity
+- hair
+- body proportions
+- pose and subject position
+- clothing
+- skin tone
+
+The generated prompt is visible in the app so photographers can see exactly what will be sent to the local engine.
+
+### Cinematic Look
+
+Reusable photographic controls can be layered over any preset:
+
+- 35mm / 50mm / 85mm lens look
+- golden hour, diffused, backlit and low-key lighting
+- shallow or deep focus
+- warm film, muted editorial, teal-orange and cool grading
+- fine film grain or high-dynamic-range treatment
+
+## Preservation modes
+
+CineStills intentionally uses two different preservation strategies.
+
+### Strict subject preservation
+
+Background and scene presets use the original V0.1 pipeline:
+
+1. Load the source photograph.
+2. Generate a new scene locally with InvokeAI / SDXL.
+3. Segment the original subject locally.
+4. Composite the **original subject pixels** over the generated scene.
+5. Preview and save.
+
+This is stronger than merely prompting the model not to change the face.
+
+### Generative identity preservation
+
+Dress, hair, product and other edits that must change subject pixels cannot use strict compositing because doing so would paste the old pixels back over the requested edit.
+
+Those recipes therefore use prompt-based identity constraints while allowing the requested area to change.
+
+> Current limitation: V0.2 does not yet provide a brush/mask editor. Generative retouch and wardrobe edits operate through the local image-to-image workflow and may affect more of the image than a future masked workflow will.
 
 ## Architecture
 
 ```text
 CineStills PySide6 App
       |
-      +--> Prompt Recipe Engine
+      +--> Structured Preset Library
+      |
+      +--> Prompt Composer
+      |        |
+      |        +--> Subject Locks
+      |        +--> Cinematic Look
       |
       +--> InvokeAI local HTTP API
       |        |
@@ -31,7 +82,7 @@ CineStills PySide6 App
       |
       +--> Local Subject Segmentation
       |
-      +--> Strict Original-Subject Composite
+      +--> Strict Composite when the edit allows it
       |
       +--> Preview / Save
 ```
@@ -51,7 +102,11 @@ No terminal commands are required.
 1. Run **`setup.cmd`** once.
 2. Keep InvokeAI running.
 3. Run **`start.cmd`** to open CineStills AI Studio.
-4. Choose a photo, select a preset and click **Generate Locally**.
+4. Choose a photo.
+5. Select **Mode → Category → Preset**.
+6. Adjust Subject Lock and Cinematic Look controls if needed.
+7. Click **Generate Locally**.
+8. Save the result.
 
 If dependencies change, `start.cmd` automatically sends you through `setup.cmd` once.
 
@@ -59,9 +114,25 @@ If dependencies change, `start.cmd` automatically sends you through `setup.cmd` 
 
 The subject-segmentation component may download its free model weights on first use. After they are cached, subject masking runs locally.
 
+## Prompt-library design
+
+Presets are stored as structured recipes rather than one giant collection of pasted prompts. Each recipe contains:
+
+- editing mode
+- category
+- scene/edit instruction
+- preservation strategy
+- searchable tags
+
+This makes the studio library easier to expand with additional maternity, pre-wedding, kids, portrait, product and commercial packs.
+
 ## Privacy
 
 CineStills does not require an OpenAI or Gemini API key for local mode. The source image, generated image and segmentation work remain on your machine when using local InvokeAI.
+
+## Roadmap
+
+The next high-value editing layer is a local **Magic Brush / mask editor** so users can paint the exact region for hair cleanup, garment extension, prop insertion or object removal before generation.
 
 ## Project philosophy
 
