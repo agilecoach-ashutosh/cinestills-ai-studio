@@ -33,6 +33,7 @@ class MaskCanvas(QWidget):
         self._mask.fill(0)
         self._brush_size = 70
         self._erase = False
+        self._base_erase = False
         self._right_click_override = False
         self._dragging = False
         self._last_image_point: QPointF | None = None
@@ -43,7 +44,8 @@ class MaskCanvas(QWidget):
         self._brush_size = max(5, int(size))
 
     def set_erase(self, erase: bool) -> None:
-        self._erase = bool(erase)
+        self._base_erase = bool(erase)
+        self._erase = self._base_erase
 
     def clear_mask(self) -> None:
         self._mask.fill(0)
@@ -130,7 +132,7 @@ class MaskCanvas(QWidget):
             self._last_image_point = None
             if self._right_click_override:
                 self._right_click_override = False
-                self._erase = False
+                self._erase = self._base_erase
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
