@@ -7,6 +7,7 @@ import time
 
 from PIL import Image
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -59,8 +61,14 @@ class MainWindow(QMainWindow):
         self._setting_prompt = False
         self._prompt_user_edited = False
 
+        self.pages = QStackedWidget()
+        self.setCentralWidget(self.pages)
+
+        self.quick_page = self._build_quick_page()
+        self.pages.addWidget(self.quick_page)
+
         root = QWidget()
-        self.setCentralWidget(root)
+        self.pages.addWidget(root)
         outer = QVBoxLayout(root)
         outer.setContentsMargins(18, 16, 18, 16)
         outer.setSpacing(12)
@@ -80,6 +88,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(splitter, 1)
 
         outer.addLayout(self._build_bottom_actions())
+        self._build_menu()
         self.setStyleSheet(self._stylesheet())
 
         self._select_mode(self.active_mode)
@@ -88,6 +97,102 @@ class MainWindow(QMainWindow):
         self.connection_timer.setInterval(5000)
         self.connection_timer.timeout.connect(self.check_invoke)
         self.connection_timer.start()
+
+    def _build_menu(self) -> None:
+        workspace_menu = self.menuBar().addMenu("Workspace")
+        quick_action = QAction("Quick Generate", self)
+        quick_action.setShortcut("Ctrl+1")
+        quick_action.triggered.connect(lambda: self._show_workspace(0))
+        studio_action = QAction("Portrait Studio", self)
+        studio_action.setShortcut("Ctrl+2")
+        studio_action.triggered.connect(lambda: self._show_workspace(1))
+        workspace_menu.addAction(quick_action)
+        workspace_menu.addAction(studio_action)
+        workspace_menu.addSeparator()
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        workspace_menu.addAction(exit_action)
+
+    def _show_workspace(self, index: int) -> None:
+        self.pages.setCurrentIndex(index)
+        self.statusBar().showMessage(
+            "Quick Generate" if index == 0 else "Portrait Studio · themes, masks and advanced controls",
+            3000,
+        )
+
+    def _build_quick_page(self) -> QWidget:
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(28, 22, 28, 24)
+        outer.setSpacing(16)
+
+        header = QHBoxLayout()
+        brand_stack = QVBoxLayout()
+        brand = QLabel("CineStills AI Studio")
+        brand.setObjectName("brand")
+        tagline = QLabel("Upload. Describe. Generate.")
+        tagline.setObjectName("tagline")
+        brand_stack.addWidget(brand)
+        brand_stack.addWidget(tagline)
+        header.addLayout(brand_stack)
+        header.addStretch(1)
+        studio_button = QPushButton("Open Portrait Studio")
+        studio_button.clicked.connect(lambda: self._show_workspace(1))
+        header.addWidget(studio_button)
+        outer.addLayout(header)
+
+        content = QHBoxLayout()
+        content.setSpacing(18)
+        self.quick_original = ImagePanel("SOURCE PHOTO", "Upload a photo to begin")
+        self.quick_preview = ImagePanel("GENERATED RESULT", "Your result will appear here")
+        content.addWidget(self.quick_original, 1)
+        content.addWidget(self.quick_preview, 1)
+        outer.addLayout(content, 1)
+
+        prompt_card = QFrame()
+        prompt_card.setObjectName("quickPromptCard")
+        prompt_layout = QVBoxLayout(prompt_card)
+        prompt_layout.setContentsMargins(18, 16, 18, 16)
+        prompt_layout.setSpacing(10)
+        prompt_title = QLabel("WHAT DO YOU WANT TO CREATE?")
+        prompt_title.setObjectName("sectionTitle")
+        prompt_layout.addWidget(prompt_title)
+        self.quick_prompt = QPlainTextEdit()
+        self.quick_prompt.setPlaceholderText(
+            "Example: Change the background to a premium office with warm window light, "
+            "keep the person and face exactly the same."
+        )
+        self.quick_prompt.setMinimumHeight(105)
+        prompt_layout.addWidget(self.quick_prompt)
+
+        controls = QHBoxLayout()
+        self.quick_upload = QPushButton("＋  Upload Photo")
+        self.quick_upload.setObjectName("uploadButton")
+        self.quick_upload.clicked.connect(self.choose_photo)
+        controls.addWidget(self.quick_upload)
+        controls.addWidget(QLabel("Change strength"))
+        self.quick_strength = QComboBox()
+        self.quick_strength.addItems(["Natural", "Creative", "Dramatic"])
+        controls.addWidget(self.quick_strength)
+        self.quick_identity = QLabel("● EXACT FACE LOCK ON")
+        self.quick_identity.setObjectName("identityStrict")
+        controls.addWidget(self.quick_identity)
+        controls.addStretch(1)
+        self.quick_generate = QPushButton("Generate")
+        self.quick_generate.setObjectName("generateButton")
+        self.quick_generate.clicked.connect(self.generate_quick)
+        controls.addWidget(self.quick_generate)
+        self.quick_save = QPushButton("Save Result")
+        self.quick_save.setEnabled(False)
+        self.quick_save.clicked.connect(self.save_result)
+        controls.addWidget(self.quick_save)
+        prompt_layout.addLayout(controls)
+
+        self.quick_status = QLabel("Upload a photo, enter a prompt, then select Generate.")
+        self.quick_status.setObjectName("status")
+        prompt_layout.addWidget(self.quick_status)
+        outer.addWidget(prompt_card)
+        return page
 
     def _build_header(self) -> QHBoxLayout:
         header = QHBoxLayout()
@@ -525,9 +630,13 @@ class MainWindow(QMainWindow):
         self._update_mask_badge()
         self.original.set_image(path)
         self.preview.clear_image("Choose a look and generate")
+        self.quick_original.set_image(path)
+        self.quick_preview.clear_image("Enter a prompt and generate")
         self.photo_status.setText(Path(path).name)
         self.save.setEnabled(False)
+        self.quick_save.setEnabled(False)
         self.status.setText("Portrait ready · choose a transformation and look.")
+        self.quick_status.setText(f"Ready: {Path(path).name}")
 
     def edit_mask(self) -> None:
         if not self.source_path:
@@ -566,6 +675,9 @@ class MainWindow(QMainWindow):
 
     def _generation_strength(self) -> float:
         return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.intensity.currentText()]
+
+    def _quick_generation_strength(self) -> float:
+        return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.quick_strength.currentText()]
 
     @staticmethod
     def _uses_exact_face_lock(preset: StudioPreset) -> bool:
@@ -617,17 +729,66 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(lambda: self.generate.setEnabled(True))
         self.worker.start()
 
+    def generate_quick(self) -> None:
+        if not self.source_path:
+            QMessageBox.information(self, "Upload a photo", "Select a source photo first.")
+            return
+        creative_prompt = self.quick_prompt.toPlainText().strip()
+        if not creative_prompt:
+            QMessageBox.information(self, "Enter a prompt", "Describe what you want to create first.")
+            self.quick_prompt.setFocus()
+            return
+        health = self.invoke.health()
+        self._apply_connection_status(health.ok, health.detail)
+        if not health.ok:
+            QMessageBox.warning(self, "InvokeAI is offline", "Start InvokeAI locally, then try again.\n\n" + health.detail)
+            return
+
+        protected_prompt = (
+            creative_prompt
+            + "\n\n[IDENTITY LOCK - PROTECTED]\n"
+            + "Use the uploaded photograph as the primary identity reference. Preserve the same "
+            + "recognisable person, facial geometry, both eyes, nose, lips, jawline, expression and "
+            + "natural skin tone. Keep the original pose and camera angle. Do not create a different "
+            + "person, duplicate person, distorted anatomy, text or watermark.\n[/IDENTITY LOCK]"
+        )
+        self.quick_generate.setEnabled(False)
+        self.generate.setEnabled(False)
+        self.quick_save.setEnabled(False)
+        self.save.setEnabled(False)
+        self.quick_preview.clear_image("Creating your image…")
+        self.quick_status.setText("Generating locally with Exact Face Lock…")
+        self.worker = GenerationWorker(
+            source_path=self.source_path,
+            prompt=protected_prompt,
+            base_url=self.invoke.base_url,
+            strict_composite=False,
+            exact_face_lock=True,
+            strength=self._quick_generation_strength(),
+        )
+        self.worker.status.connect(self.quick_status.setText)
+        self.worker.succeeded.connect(self.generation_succeeded)
+        self.worker.failed.connect(self.generation_failed)
+        self.worker.finished.connect(lambda: self.quick_generate.setEnabled(True))
+        self.worker.finished.connect(lambda: self.generate.setEnabled(True))
+        self.worker.start()
+
     def generation_succeeded(self, path: str) -> None:
         self.result_path = path
         self.preview.set_image(path)
+        self.quick_preview.set_image(path)
         self.save.setEnabled(True)
+        self.quick_save.setEnabled(True)
         self.check_invoke()
         self.status.setText("Done · compare the result, refine the prompt or save.")
+        self.quick_status.setText("Done · refine the prompt and generate again, or save the result.")
 
     def generation_failed(self, message: str) -> None:
         self.result_path = None
         self.preview.clear_image("Generation failed")
+        self.quick_preview.clear_image("Generation failed")
         self.status.setText("Generation failed")
+        self.quick_status.setText("Generation failed")
         self.check_invoke()
         QMessageBox.critical(self, "Local generation failed", message + "\n\nClose CineStills and run setup.cmd once if dependencies changed.")
 
@@ -663,6 +824,7 @@ class MainWindow(QMainWindow):
         #step { color: #C5CBD5; font-weight: 700; }
         #stepDivider { color: #586174; font-size: 18px; }
         #sidePanel { background: #12151B; border: 1px solid #242A34; border-radius: 14px; }
+        #quickPromptCard { background: #12151B; border: 1px solid #2B313D; border-radius: 14px; }
         #sectionTitle { color: #D7FF00; font-size: 11px; font-weight: 850; letter-spacing: 1px; }
         #galleryTitle { font-size: 19px; font-weight: 850; }
         #panelTitle { color: #DCE1E8; font-weight: 800; }
