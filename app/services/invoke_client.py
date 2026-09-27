@@ -178,12 +178,14 @@ class InvokeClient:
         poll_interval: float = 0.75,
         timeout_seconds: int = 600,
     ) -> bytes:
-        model = self.select_sdxl_model()
+        model, vae_model, encoder_model = self.select_qwen_edit_components()
         image_name = self.upload_image(source_path)
-        graph = self._build_sdxl_img2img_graph(
+        graph = self._build_qwen_image_edit_graph(
             image_name=image_name,
             prompt=prompt,
             model=model,
+            vae_model=vae_model,
+            encoder_model=encoder_model,
             width=width,
             height=height,
             strength=strength,
