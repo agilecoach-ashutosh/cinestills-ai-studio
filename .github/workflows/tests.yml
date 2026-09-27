@@ -44,6 +44,8 @@ jobs:
           app = QApplication([])
           window = MainWindow()
           assert window.windowTitle().startswith("CineStills AI Studio")
+          assert window.pages.currentIndex() == 0
+          assert window.quick_prompt.placeholderText()
           assert window.current_preset() is not None
           window.close()
           app.quit()
