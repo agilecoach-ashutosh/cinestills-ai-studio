@@ -33,6 +33,14 @@ if not defined PYTHON_CMD (
 
 echo Using Python:
 %PYTHON_CMD% --version
+%PYTHON_CMD% -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)"
+if errorlevel 1 (
+    echo ERROR: CineStills requires Python 3.12 or later.
+    echo Install Python 3.12+, then run setup.cmd again.
+    echo.
+    pause
+    exit /b 1
+)
 echo.
 
 if not exist ".venv\Scripts\python.exe" (

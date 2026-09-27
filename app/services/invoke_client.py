@@ -41,7 +41,7 @@ class InvokeClient:
                     f"{self.base_url}{path}",
                     timeout=self.timeout,
                 )
-                if response.status_code < 500:
+                if 200 <= response.status_code < 400:
                     return InvokeHealth(True, f"Connected to {self.base_url}")
                 last_error = f"HTTP {response.status_code} from {path}"
             except requests.RequestException as exc:
@@ -56,7 +56,7 @@ class InvokeClient:
                 f"{self.base_url}/api/v1/app/version",
                 timeout=timeout,
             )
-            if response.status_code < 500:
+            if 200 <= response.status_code < 400:
                 return InvokeHealth(True, f"Connected to {self.base_url}")
             return InvokeHealth(False, f"HTTP {response.status_code} from /api/v1/app/version")
         except requests.RequestException as exc:
@@ -172,11 +172,10 @@ class InvokeClient:
         prompt: str,
         width: int,
         height: int,
-        strength: float = 0.72,
-        steps: int = 28,
-        cfg_scale: float = 5.5,
+        steps: int = 40,
+        cfg_scale: float = 4.0,
         poll_interval: float = 0.75,
-        timeout_seconds: int = 600,
+        timeout_seconds: int = 1800,
     ) -> bytes:
         model, vae_model, encoder_model = self.select_qwen_edit_components()
         image_name = self.upload_image(source_path)
@@ -188,7 +187,6 @@ class InvokeClient:
             encoder_model=encoder_model,
             width=width,
             height=height,
-            strength=strength,
             steps=steps,
             cfg_scale=cfg_scale,
         )
@@ -240,7 +238,7 @@ class InvokeClient:
 
             time.sleep(poll_interval)
 
-        raise InvokeError("InvokeAI generation timed out after 10 minutes.")
+        raise InvokeError(f"InvokeAI generation timed out after {timeout_seconds // 60} minutes.")
 
     def download_image(self, image_name: str) -> bytes:
         response = requests.get(
@@ -259,7 +257,6 @@ class InvokeClient:
         encoder_model: dict,
         width: int,
         height: int,
-        strength: float,
         steps: int,
         cfg_scale: float,
     ) -> dict:
@@ -278,6 +275,7 @@ class InvokeClient:
         image = node_id("reference-image")
         collect = node_id("reference-collect")
         pos = node_id("positive")
+        neg = node_id("negative")
         ref_i2l = node_id("reference-i2l")
         denoise = node_id("denoise")
         l2i = node_id("l2i")
@@ -285,8 +283,10 @@ class InvokeClient:
         # InvokeAI trains/conditions Qwen Image Edit references around a 1024^2
         # pixel area. Preserve aspect ratio and snap to the required 32px grid.
         ratio = max(width, 1) / max(height, 1)
-        ref_width = max(32, round(((1024 * 1024 * ratio) ** 0.5) / 32) * 32)
-        ref_height = max(32, round((ref_width / ratio) / 32) * 32)
+        raw_ref_width = (1024 * 1024 * ratio) ** 0.5
+        raw_ref_height = raw_ref_width / ratio
+        ref_width = max(32, round(raw_ref_width / 32) * 32)
+        ref_height = max(32, round(raw_ref_height / 32) * 32)
 
         nodes = {
             loader: {
@@ -315,6 +315,14 @@ class InvokeClient:
                 "id": pos,
                 "type": "qwen_image_text_encoder",
                 "prompt": prompt,
+                "quantization": "none",
+                "is_intermediate": True,
+                "use_cache": True,
+            },
+            neg: {
+                "id": neg,
+                "type": "qwen_image_text_encoder",
+                "prompt": " ",
                 "quantization": "none",
                 "is_intermediate": True,
                 "use_cache": True,
@@ -361,12 +369,14 @@ class InvokeClient:
 
         edges = [
             edge(loader, "qwen_vl_encoder", pos, "qwen_vl_encoder"),
+            edge(loader, "qwen_vl_encoder", neg, "qwen_vl_encoder"),
             edge(image, "image", collect, "item"),
             edge(collect, "collection", pos, "reference_images"),
             edge(loader, "vae", ref_i2l, "vae"),
             edge(ref_i2l, "latents", denoise, "reference_latents"),
             edge(loader, "transformer", denoise, "transformer"),
             edge(pos, "conditioning", denoise, "positive_conditioning"),
+            edge(neg, "conditioning", denoise, "negative_conditioning"),
             edge(denoise, "latents", l2i, "latents"),
             edge(loader, "vae", l2i, "vae"),
         ]

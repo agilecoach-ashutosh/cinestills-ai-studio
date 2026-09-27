@@ -32,7 +32,6 @@ def test_qwen_reference_edit_starts_from_noise():
         encoder_model=encoder,
         width=768,
         height=1024,
-        strength=0.72,
         steps=20,
         cfg_scale=4.0,
     )
@@ -48,3 +47,38 @@ def test_qwen_reference_edit_starts_from_noise():
         and edge["destination"]["field"] == "latents"
         for edge in graph["edges"]
     )
+    assert any(
+        edge["destination"]["node_id"] == denoise["id"]
+        and edge["destination"]["field"] == "negative_conditioning"
+        for edge in graph["edges"]
+    )
+    ref_i2l = next(node for node in graph["nodes"].values() if node["type"] == "qwen_image_i2l")
+    assert ref_i2l["width"] % 32 == 0
+    assert ref_i2l["height"] % 32 == 0
+
+
+
+def test_qwen_model_selection_prefers_q8(monkeypatch):
+    client = InvokeClient(base_url="http://127.0.0.1:9090")
+    models = [
+        {"key":"q4","hash":"h1","name":"Qwen Image Edit 2511 (Q4_K_M)","base":"qwen-image","type":"main"},
+        {"key":"q8","hash":"h2","name":"Qwen Image Edit 2511 (Q8_0)","base":"qwen-image","type":"main"},
+        {"key":"vae","hash":"h3","name":"Qwen Image VAE","base":"qwen-image","type":"vae"},
+        {"key":"enc","hash":"h4","name":"Qwen2.5-VL Encoder (fp8 scaled)","base":"any","type":"qwen_vl_encoder"},
+    ]
+    monkeypatch.setattr(client, "list_models", lambda: models)
+
+    model, vae, encoder = client.select_qwen_edit_components()
+
+    assert model["key"] == "q8"
+    assert vae["key"] == "vae"
+    assert encoder["key"] == "enc"
+
+
+def test_qwen_graph_uses_official_quality_defaults():
+    import inspect
+
+    signature = inspect.signature(InvokeClient.edit_image)
+    assert signature.parameters["steps"].default == 40
+    assert signature.parameters["cfg_scale"].default == 4.0
+    assert signature.parameters["timeout_seconds"].default == 1800

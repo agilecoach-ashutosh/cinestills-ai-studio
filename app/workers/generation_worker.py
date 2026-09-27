@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from PySide6.QtCore import QThread, Signal
 
 from app.services.identity_guard import create_subject_mask, prepare_working_image
-from app.services.face_lock import preserve_original_face
+from app.services.face_lock import detect_primary_face, preserve_original_face
 from app.services.invoke_client import InvokeClient
 from app.services.mask_ops import apply_edit_mask
 
@@ -26,7 +26,6 @@ class GenerationWorker(QThread):
         strict_composite: bool = True,
         exact_face_lock: bool = False,
         edit_mask_path: str | None = None,
-        strength: float = 0.72,
     ) -> None:
         super().__init__()
         self.source_path = source_path
@@ -35,7 +34,6 @@ class GenerationWorker(QThread):
         self.strict_composite = strict_composite
         self.exact_face_lock = exact_face_lock
         self.edit_mask_path = edit_mask_path
-        self.strength = strength
 
     def run(self) -> None:
         try:
@@ -52,6 +50,14 @@ class GenerationWorker(QThread):
             self.status.emit("Preparing image...")
             width, height = prepare_working_image(self.source_path, working_path)
 
+            with Image.open(self.source_path) as source_image:
+                original = ImageOps.exif_transpose(source_image).convert("RGB")
+
+            face_region = None
+            if self.exact_face_lock:
+                self.status.emit("Checking face identity lock...")
+                face_region = detect_primary_face(original)
+
             self.status.emit("Generating locally with InvokeAI...")
             client = InvokeClient(base_url=self.base_url)
             generated_bytes = client.edit_image(
@@ -59,10 +65,7 @@ class GenerationWorker(QThread):
                 prompt=self.prompt,
                 width=width,
                 height=height,
-                strength=self.strength,
             )
-
-            original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
 
             if self.edit_mask_path:
                 self.status.emit("Applying Magic Brush selection...")
@@ -81,10 +84,16 @@ class GenerationWorker(QThread):
                 edited = Image.composite(original, edited, subject_mask)
             elif self.exact_face_lock:
                 self.status.emit("Applying Exact Face Lock...")
-                edited = preserve_original_face(original, edited)
+                edited = preserve_original_face(original, edited, face_region)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             edited.save(output_path, "PNG")
             self.succeeded.emit(str(output_path))
         except Exception as exc:
             self.failed.emit(str(exc))
+        finally:
+            try:
+                if "working_path" in locals():
+                    working_path.unlink(missing_ok=True)
+            except OSError:
+                pass

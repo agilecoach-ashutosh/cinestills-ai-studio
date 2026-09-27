@@ -4,15 +4,16 @@
 
 CineStills AI Studio is a local-first portrait transformation application for photographers and everyday users. Its default Quick Generate workspace needs only a photo and a plain-language prompt. The complete theme-based workflow remains available under **Workspace → Portrait Studio**.
 
-## V0.5 Quick Generate
+## V0.6 Qwen Image Edit
 
 The default screen is intentionally minimal:
 
 1. Upload a photo.
 2. Write what you want in ordinary language.
-3. Choose Natural, Creative or Dramatic strength.
-4. Select Generate.
-5. Compare and save the result.
+3. Select Generate.
+4. Compare and save the result.
+
+Quick Generate now uses **Qwen Image Edit 2511** through the local InvokeAI API. The visible prompt is sent as written. Qwen's reference-image conditioning provides the edit context, while CineStills keeps local post-processing options for masks and identity preservation.
 
 Quick Generate sends the visible prompt exactly as written. It does not silently add identity, pose, camera-angle or composition constraints. Use **Workspace → Portrait Studio** (or `Ctrl+2`) for the full theme gallery, masks and photographic controls. Return to Quick Generate with `Ctrl+1`.
 
@@ -67,7 +68,7 @@ Background transformations generate the new scene and then composite the origina
 
 ### Reference Identity Lock
 
-Complete redesign, outfit, lighting and professional portrait modes add **Exact Face Lock** on top of the source image-to-image reference. CineStills detects the primary frontal face locally, generates the redesign, and then restores the identity-bearing source face pixels through a soft oval blend. If no clear face is detected, generation stops instead of silently risking a different identity.
+Complete redesign, outfit and professional portrait modes use **Exact Face Lock** on top of Qwen reference-image conditioning. CineStills detects the primary frontal face before generation and then restores the identity-bearing source face pixels through a soft oval blend. If no clear face is detected, generation stops before the long generation starts. Lighting, skin-retouching and restoration modes intentionally rely on Qwen reference consistency so the requested facial lighting or retouch can remain visible.
 
 ### Painted edit area
 
@@ -92,19 +93,22 @@ No terminal commands are required.
 3. Run **`start.cmd`**.
 4. Upload a portrait and choose a look.
 
-If dependencies change, `start.cmd` routes back through setup automatically.
+If a required Python component is missing, `start.cmd` routes back through setup automatically.
 
 ## Requirements
 
 - Windows 10/11
-- Python 3.12 recommended
+- Python 3.12 or later
 - InvokeAI Community Edition running locally
-- An SDXL main model installed in InvokeAI
-- NVIDIA GPU recommended
+- InvokeAI with the **Qwen Image Edit 2511** bundle components installed:
+  - Qwen Image Edit 2511 (Q8_0 recommended for quality, Q4_K_M supported as fallback)
+  - Qwen2.5-VL Encoder
+  - Qwen Image VAE
+- NVIDIA GPU recommended; lower-VRAM systems may rely heavily on InvokeAI model offloading and take longer
 
 ## Current quality boundary
 
-Strict background replacement retains the original person pixel-for-pixel. Full redesigns now retain the central facial pixels with Exact Face Lock while allowing hair, clothing, lighting and surroundings to change. This works best with a clear frontal or near-frontal portrait and the original pose; it deliberately stops when a face cannot be detected. Large pose changes and profile faces still require a dedicated face-reference adapter plus similarity validation in a later model-layer upgrade.
+Strict background replacement retains the original person pixel-for-pixel. Complete redesign, outfit and professional-portrait workflows can retain the central facial pixels with Exact Face Lock while Qwen Image Edit 2511 changes the requested content. This works best with a clear frontal or near-frontal portrait. Profile faces and very large pose changes may still need a more specialized identity-reference workflow.
 
 ## Architecture
 
@@ -121,7 +125,7 @@ Portrait upload
       |        |
       |        +--> Protected Identity Lock
       |
-      +--> InvokeAI / SDXL local generation
+      +--> InvokeAI / Qwen Image Edit 2511
       |        |
       |        +--> Optional painted-area composite
       |        +--> Strict subject composite for backgrounds
@@ -133,8 +137,7 @@ Portrait upload
 
 - Original photographic preview artwork for every theme card
 - Native InvokeAI inpainting instead of output-only mask compositing
-- Face-reference conditioning for major restyles
-- Automated identity-similarity checks and retry
+- Automated identity-similarity checks and retry for major restyles
 - Four-result contact sheet and before/after slider
 - Favourites and full personal-preset gallery
 

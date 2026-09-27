@@ -15,13 +15,24 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.services.image_io import load_oriented_image
+
 
 class MaskCanvas(QWidget):
     """Paintable edit mask. White pixels may change; black pixels stay protected."""
 
     def __init__(self, image_path: str) -> None:
         super().__init__()
-        self._source = QPixmap(image_path)
+        oriented = load_oriented_image(image_path)
+        raw = oriented.tobytes("raw", "RGBA")
+        qimage = QImage(
+            raw,
+            oriented.width,
+            oriented.height,
+            oriented.width * 4,
+            QImage.Format.Format_RGBA8888,
+        ).copy()
+        self._source = QPixmap.fromImage(qimage)
         if self._source.isNull():
             raise ValueError(f"Could not load image: {image_path}")
 

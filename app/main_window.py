@@ -168,10 +168,6 @@ class MainWindow(QMainWindow):
         self.quick_upload.setObjectName("uploadButton")
         self.quick_upload.clicked.connect(self.choose_photo)
         controls.addWidget(self.quick_upload)
-        controls.addWidget(QLabel("Change strength"))
-        self.quick_strength = QComboBox()
-        self.quick_strength.addItems(["Natural", "Creative", "Dramatic"])
-        controls.addWidget(self.quick_strength)
         self.quick_identity = QLabel("PROMPT SENT AS WRITTEN")
         self.quick_identity.setObjectName("hint")
         controls.addWidget(self.quick_identity)
@@ -585,9 +581,9 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Choose Portrait", "", "Images (*.png *.jpg *.jpeg *.webp)")
         if not path:
             return
+        self._remove_mask_file()
         self.source_path = path
         self.result_path = None
-        self.mask_path = None
         self._update_mask_badge()
         self.original.set_image(path)
         self.preview.clear_image("Choose a look and generate")
@@ -615,12 +611,13 @@ class MainWindow(QMainWindow):
         if not dialog.save_mask(mask_path):
             QMessageBox.warning(self, "Mask not saved", "CineStills could not save the painted area.")
             return
+        self._remove_mask_file()
         self.mask_path = str(mask_path)
         self._update_mask_badge()
         self.status.setText("Painted edit area active.")
 
     def clear_edit_mask(self) -> None:
-        self.mask_path = None
+        self._remove_mask_file()
         self._update_mask_badge()
         self.status.setText("Painted edit area cleared.")
 
@@ -634,11 +631,28 @@ class MainWindow(QMainWindow):
         self.mask_badge.style().unpolish(self.mask_badge)
         self.mask_badge.style().polish(self.mask_badge)
 
-    def _generation_strength(self) -> float:
-        return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.intensity.currentText()]
+    def _uses_exact_face_lock(self, preset: StudioPreset) -> bool:
+        return preset.mode in {"Complete Redesign", "Change Outfit", "Professional Portrait"}
 
-    def _quick_generation_strength(self) -> float:
-        return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.quick_strength.currentText()]
+    def _set_generation_busy(self, busy: bool) -> None:
+        self.generate.setEnabled(not busy)
+        self.quick_generate.setEnabled(not busy)
+        if busy:
+            self.save.setEnabled(False)
+            self.quick_save.setEnabled(False)
+
+    def _remove_mask_file(self) -> None:
+        if not self.mask_path:
+            return
+        try:
+            mask = Path(self.mask_path)
+            temp_masks = (Path.cwd() / "temp" / "masks").resolve()
+            resolved = mask.resolve()
+            if temp_masks in resolved.parents:
+                resolved.unlink(missing_ok=True)
+        except OSError:
+            pass
+        self.mask_path = None
 
     def generate_local(self) -> None:
         if not self.source_path:
@@ -656,14 +670,13 @@ class MainWindow(QMainWindow):
             )
             if choice != QMessageBox.StandardButton.Yes:
                 return
-        health = self.invoke.health()
+        health = self.invoke.health_quick(timeout=1.5)
         self._apply_connection_status(health.ok, health.detail)
         if not health.ok:
             QMessageBox.warning(self, "InvokeAI is offline", "Start InvokeAI locally, then try again.\n\n" + health.detail)
             return
 
-        self.generate.setEnabled(False)
-        self.save.setEnabled(False)
+        self._set_generation_busy(True)
         self.preview.clear_image("Creating your portrait…")
         self.status.setText(f"Applying {preset.name} with Identity Lock…")
         self.worker = GenerationWorker(
@@ -671,14 +684,13 @@ class MainWindow(QMainWindow):
             prompt=self.build_current_prompt(),
             base_url=self.invoke.base_url,
             strict_composite=preset.strict_composite,
-            exact_face_lock=False,
+            exact_face_lock=self._uses_exact_face_lock(preset),
             edit_mask_path=self.mask_path,
-            strength=self._generation_strength(),
         )
         self.worker.status.connect(self.status.setText)
         self.worker.succeeded.connect(self.generation_succeeded)
         self.worker.failed.connect(self.generation_failed)
-        self.worker.finished.connect(lambda: self.generate.setEnabled(True))
+        self.worker.finished.connect(lambda: self._set_generation_busy(False))
         self.worker.start()
 
     def generate_quick(self) -> None:
@@ -690,16 +702,13 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Enter a prompt", "Describe what you want to create first.")
             self.quick_prompt.setFocus()
             return
-        health = self.invoke.health()
+        health = self.invoke.health_quick(timeout=1.5)
         self._apply_connection_status(health.ok, health.detail)
         if not health.ok:
             QMessageBox.warning(self, "InvokeAI is offline", "Start InvokeAI locally, then try again.\n\n" + health.detail)
             return
 
-        self.quick_generate.setEnabled(False)
-        self.generate.setEnabled(False)
-        self.quick_save.setEnabled(False)
-        self.save.setEnabled(False)
+        self._set_generation_busy(True)
         self.quick_preview.clear_image("Creating your image…")
         self.quick_status.setText("Generating locally from your prompt…")
         self.worker = GenerationWorker(
@@ -708,13 +717,11 @@ class MainWindow(QMainWindow):
             base_url=self.invoke.base_url,
             strict_composite=False,
             exact_face_lock=False,
-            strength=self._quick_generation_strength(),
         )
         self.worker.status.connect(self.quick_status.setText)
         self.worker.succeeded.connect(self.generation_succeeded)
         self.worker.failed.connect(self.generation_failed)
-        self.worker.finished.connect(lambda: self.quick_generate.setEnabled(True))
-        self.worker.finished.connect(lambda: self.generate.setEnabled(True))
+        self.worker.finished.connect(lambda: self._set_generation_busy(False))
         self.worker.start()
 
     def generation_succeeded(self, path: str) -> None:
@@ -734,7 +741,28 @@ class MainWindow(QMainWindow):
         self.status.setText("Generation failed")
         self.quick_status.setText("Generation failed")
         self.check_invoke()
-        QMessageBox.critical(self, "Local generation failed", message + "\n\nClose CineStills and run setup.cmd once if dependencies changed.")
+        lower_message = message.lower()
+        if "out of memory" in lower_message or ("cuda" in lower_message and "memory" in lower_message):
+            guidance = (
+                "Qwen Image Edit Q8_0 is memory-heavy. If InvokeAI cannot offload it successfully, "
+                "install Qwen Image Edit 2511 (Q4_K_M) and remove Q8_0, then try again."
+            )
+        elif "disk space" in lower_message or "no space left" in lower_message:
+            guidance = "Free additional disk space on the drive used by InvokeAI, then retry."
+        elif "qwen" in lower_message and ("not found" in lower_message or "no source" in lower_message):
+            guidance = (
+                "Check InvokeAI Model Manager for Qwen Image Edit 2511, Qwen2.5-VL Encoder and Qwen Image VAE."
+            )
+        else:
+            guidance = (
+                "No reinstall is needed for an InvokeAI generation error. "
+                "Check that InvokeAI is running and the required Qwen models are installed."
+            )
+        QMessageBox.critical(
+            self,
+            "Local generation failed",
+            message + "\n\n" + guidance,
+        )
 
     def save_result(self) -> None:
         if not self.result_path:
