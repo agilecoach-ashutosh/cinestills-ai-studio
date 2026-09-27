@@ -75,43 +75,77 @@ class InvokeClient:
             models = payload
         return models if isinstance(models, list) else []
 
-    def select_sdxl_model(self) -> dict:
-        models = self.list_models()
-        compatible = [
-            model
-            for model in models
-            if str(model.get("base", "")).lower() == "sdxl"
-            and str(model.get("type", "")).lower() == "main"
-        ]
-        if not compatible:
-            raise InvokeError(
-                "No SDXL main model was found in InvokeAI. Install the SDXL starter bundle first."
-            )
-
-        preferred = next(
-            (
-                model
-                for model in compatible
-                if "juggernaut" in str(model.get("name", "")).lower()
-            ),
-            compatible[0],
-        )
-
+    @staticmethod
+    def _model_identifier(model: dict) -> dict:
         required = ("key", "hash", "name", "base", "type")
-        missing = [field for field in required if not preferred.get(field)]
+        missing = [field for field in required if not model.get(field)]
         if missing:
             raise InvokeError(
                 "InvokeAI returned an incomplete model record: " + ", ".join(missing)
             )
-
         return {
-            "key": preferred["key"],
-            "hash": preferred["hash"],
-            "name": preferred["name"],
-            "base": preferred["base"],
-            "type": preferred["type"],
+            "key": model["key"],
+            "hash": model["hash"],
+            "name": model["name"],
+            "base": model["base"],
+            "type": model["type"],
             "submodel_type": None,
         }
+
+    def select_qwen_edit_components(self) -> tuple[dict, dict, dict]:
+        """Select the installed Qwen Image Edit transformer and its standalone components."""
+        models = self.list_models()
+
+        main_models = [
+            model
+            for model in models
+            if str(model.get("base", "")).lower() == "qwen-image"
+            and str(model.get("type", "")).lower() == "main"
+            and "qwen image edit 2511" in str(model.get("name", "")).lower()
+        ]
+        if not main_models:
+            raise InvokeError(
+                "Qwen Image Edit 2511 was not found in InvokeAI. Install the Qwen Image bundle first."
+            )
+
+        # Prefer the quality-first Q8_0 build used by CineStills, with any installed
+        # 2511 edit build as a fallback.
+        edit_model = next(
+            (
+                model
+                for model in main_models
+                if "q8_0" in str(model.get("name", "")).lower()
+            ),
+            main_models[0],
+        )
+
+        vae = next(
+            (
+                model
+                for model in models
+                if str(model.get("type", "")).lower() == "vae"
+                and "qwen image vae" in str(model.get("name", "")).lower()
+            ),
+            None,
+        )
+        encoder = next(
+            (
+                model
+                for model in models
+                if "qwen2.5-vl encoder" in str(model.get("name", "")).lower()
+            ),
+            None,
+        )
+        if vae is None:
+            raise InvokeError("Qwen Image VAE was not found in InvokeAI.")
+        if encoder is None:
+            raise InvokeError("Qwen2.5-VL Encoder was not found in InvokeAI.")
+
+        return (
+            self._model_identifier(edit_model),
+            self._model_identifier(vae),
+            self._model_identifier(encoder),
+        )
 
     def upload_image(self, path: str | Path) -> str:
         image_path = Path(path)
@@ -214,105 +248,102 @@ class InvokeClient:
         self._raise_for_status(response, "Could not download the generated image")
         return response.content
 
-    def _build_sdxl_img2img_graph(
+    def _build_qwen_image_edit_graph(
         self,
         image_name: str,
         prompt: str,
         model: dict,
+        vae_model: dict,
+        encoder_model: dict,
         width: int,
         height: int,
         strength: float,
         steps: int,
         cfg_scale: float,
     ) -> dict:
+        """Build the native InvokeAI Qwen Image Edit graph.
+
+        The source photo is used twice, matching InvokeAI's own Qwen graph:
+        as a VL reference image for instruction-aware editing and as reference
+        latents for the edit transformer.
+        """
         prefix = uuid.uuid4().hex[:10]
 
         def node_id(name: str) -> str:
             return f"cinestills-{prefix}-{name}"
 
         loader = node_id("model")
+        image = node_id("reference-image")
+        collect = node_id("reference-collect")
         pos = node_id("positive")
-        neg = node_id("negative")
-        noise = node_id("noise")
-        i2l = node_id("i2l")
+        ref_i2l = node_id("reference-i2l")
         denoise = node_id("denoise")
         l2i = node_id("l2i")
 
-        negative_prompt = "low quality, blurry, compression artifacts"
+        # InvokeAI trains/conditions Qwen Image Edit references around a 1024^2
+        # pixel area. Preserve aspect ratio and snap to the required 32px grid.
+        ratio = max(width, 1) / max(height, 1)
+        ref_width = max(32, round(((1024 * 1024 * ratio) ** 0.5) / 32) * 32)
+        ref_height = max(32, round((ref_width / ratio) / 32) * 32)
 
         nodes = {
             loader: {
                 "id": loader,
-                "type": "sdxl_model_loader",
+                "type": "qwen_image_model_loader",
                 "model": model,
+                "vae_model": vae_model,
+                "qwen_vl_encoder_model": encoder_model,
+                "is_intermediate": True,
+                "use_cache": True,
+            },
+            image: {
+                "id": image,
+                "type": "image",
+                "image": {"image_name": image_name},
+                "is_intermediate": True,
+                "use_cache": True,
+            },
+            collect: {
+                "id": collect,
+                "type": "collect",
                 "is_intermediate": True,
                 "use_cache": True,
             },
             pos: {
                 "id": pos,
-                "type": "sdxl_compel_prompt",
+                "type": "qwen_image_text_encoder",
                 "prompt": prompt,
-                "style": prompt,
-                "original_width": width,
-                "original_height": height,
-                "target_width": width,
-                "target_height": height,
-                "crop_top": 0,
-                "crop_left": 0,
+                "quantization": "none",
                 "is_intermediate": True,
                 "use_cache": True,
             },
-            neg: {
-                "id": neg,
-                "type": "sdxl_compel_prompt",
-                "prompt": negative_prompt,
-                "style": negative_prompt,
-                "original_width": width,
-                "original_height": height,
-                "target_width": width,
-                "target_height": height,
-                "crop_top": 0,
-                "crop_left": 0,
-                "is_intermediate": True,
-                "use_cache": True,
-            },
-            noise: {
-                "id": noise,
-                "type": "noise",
-                "seed": random.randint(0, 2_147_483_647),
-                "width": width,
-                "height": height,
-                "use_cpu": True,
-                "is_intermediate": True,
-                "use_cache": False,
-            },
-            i2l: {
-                "id": i2l,
-                "type": "i2l",
+            ref_i2l: {
+                "id": ref_i2l,
+                "type": "qwen_image_i2l",
                 "image": {"image_name": image_name},
-                "fp32": False,
+                "width": ref_width,
+                "height": ref_height,
                 "tiled": False,
                 "tile_size": 0,
-                "color_compensation": "SDXL",
                 "is_intermediate": True,
                 "use_cache": True,
             },
             denoise: {
                 "id": denoise,
-                "type": "denoise_latents",
-                "steps": steps,
-                "cfg_scale": cfg_scale,
-                "cfg_rescale_multiplier": 0,
+                "type": "qwen_image_denoise",
+                "steps": max(1, steps),
+                "cfg_scale": max(1.0, cfg_scale),
                 "denoising_start": max(0.0, min(1.0, 1.0 - strength)),
                 "denoising_end": 1.0,
-                "scheduler": "dpmpp_2m_sde_k",
+                "seed": random.randint(0, 2_147_483_647),
+                "width": max(16, round(width / 16) * 16),
+                "height": max(16, round(height / 16) * 16),
                 "is_intermediate": True,
-                "use_cache": True,
+                "use_cache": False,
             },
             l2i: {
                 "id": l2i,
-                "type": "l2i",
-                "fp32": False,
+                "type": "qwen_image_l2i",
                 "tiled": False,
                 "tile_size": 0,
                 "is_intermediate": False,
@@ -327,48 +358,21 @@ class InvokeClient:
             }
 
         edges = [
-            edge(loader, "clip", pos, "clip"),
-            edge(loader, "clip2", pos, "clip2"),
-            edge(loader, "clip", neg, "clip"),
-            edge(loader, "clip2", neg, "clip2"),
-            edge(loader, "unet", denoise, "unet"),
+            edge(loader, "qwen_vl_encoder", pos, "qwen_vl_encoder"),
+            edge(image, "image", collect, "item"),
+            edge(collect, "collection", pos, "reference_images"),
+            edge(loader, "vae", ref_i2l, "vae"),
+            edge(ref_i2l, "latents", denoise, "reference_latents"),
+            edge(loader, "transformer", denoise, "transformer"),
             edge(pos, "conditioning", denoise, "positive_conditioning"),
-            edge(neg, "conditioning", denoise, "negative_conditioning"),
-            edge(noise, "noise", denoise, "noise"),
-            edge(loader, "vae", i2l, "vae"),
-            edge(i2l, "latents", denoise, "latents"),
             edge(denoise, "latents", l2i, "latents"),
             edge(loader, "vae", l2i, "vae"),
         ]
 
         return {
-            "id": f"cinestills-{prefix}-graph",
+            "id": f"cinestills-{prefix}-qwen-edit-graph",
             "nodes": nodes,
             "edges": edges,
         }
 
-    @staticmethod
-    def _find_value(value, key: str):
-        if isinstance(value, dict):
-            if key in value and value[key]:
-                return value[key]
-            for child in value.values():
-                found = InvokeClient._find_value(child, key)
-                if found:
-                    return found
-        elif isinstance(value, list):
-            for child in value:
-                found = InvokeClient._find_value(child, key)
-                if found:
-                    return found
-        return None
 
-    @staticmethod
-    def _raise_for_status(response: requests.Response, context: str) -> None:
-        try:
-            response.raise_for_status()
-        except requests.HTTPError as exc:
-            detail = response.text.strip()
-            if len(detail) > 1200:
-                detail = detail[:1200] + "..."
-            raise InvokeError(f"{context}.\n\n{detail or exc}") from exc
