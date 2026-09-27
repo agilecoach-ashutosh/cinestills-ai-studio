@@ -378,3 +378,29 @@ class InvokeClient:
         }
 
 
+
+    @staticmethod
+    def _find_value(value, key: str):
+        if isinstance(value, dict):
+            if key in value and value[key]:
+                return value[key]
+            for child in value.values():
+                found = InvokeClient._find_value(child, key)
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for child in value:
+                found = InvokeClient._find_value(child, key)
+                if found:
+                    return found
+        return None
+
+    @staticmethod
+    def _raise_for_status(response: requests.Response, context: str) -> None:
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = response.text.strip()
+            if len(detail) > 1200:
+                detail = detail[:1200] + "..."
+            raise InvokeError(f"{context}.\n\n{detail or exc}") from exc
