@@ -14,7 +14,7 @@ The default screen is intentionally minimal:
 4. Select Generate.
 5. Compare and save the result.
 
-Exact Face Lock is always enabled in Quick Generate. Use **Workspace → Portrait Studio** (or `Ctrl+2`) for the full theme gallery, masks, photographic controls and editable generated prompts. Return to Quick Generate with `Ctrl+1`.
+Quick Generate sends the visible prompt exactly as written. It does not silently add identity, pose, camera-angle or composition constraints. Use **Workspace → Portrait Studio** (or `Ctrl+2`) for the full theme gallery, masks and photographic controls. Return to Quick Generate with `Ctrl+1`.
 
 ## V0.4 Portrait Studio
 
@@ -55,7 +55,7 @@ The generated prompt remains editable. Users can:
 - copy the final prompt
 - save the prompt as a personal preset
 
-At generation time, CineStills rebuilds a protected Identity Lock block. This prevents an accidental prompt edit from silently removing the selected face, body, pose, clothing or skin-tone protections.
+At generation time, CineStills sends the visible editable prompt without appending a protected or hidden instruction block.
 
 ## Identity-preservation strategies
 

@@ -238,10 +238,7 @@ class InvokeClient:
         denoise = node_id("denoise")
         l2i = node_id("l2i")
 
-        negative_prompt = (
-            "different person, changed identity, altered face, extra person, duplicate person, "
-            "deformed face, distorted anatomy, low quality, blurry"
-        )
+        negative_prompt = "low quality, blurry, compression artifacts"
 
         nodes = {
             loader: {
