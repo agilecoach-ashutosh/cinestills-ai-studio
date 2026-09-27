@@ -1,8 +1,20 @@
 # CineStills AI Studio
 
-**Upload a portrait. Choose a look. Keep the person.**
+**Upload. Describe. Generate.**
 
-CineStills AI Studio is a local-first portrait transformation application for photographers and everyday users. A user can upload one photograph, choose what they want to change, browse curated visual themes and generate an editable photography prompt without learning prompt engineering.
+CineStills AI Studio is a local-first portrait transformation application for photographers and everyday users. Its default Quick Generate workspace needs only a photo and a plain-language prompt. The complete theme-based workflow remains available under **Workspace → Portrait Studio**.
+
+## V0.5 Quick Generate
+
+The default screen is intentionally minimal:
+
+1. Upload a photo.
+2. Write what you want in ordinary language.
+3. Choose Natural, Creative or Dramatic strength.
+4. Select Generate.
+5. Compare and save the result.
+
+Exact Face Lock is always enabled in Quick Generate. Use **Workspace → Portrait Studio** (or `Ctrl+2`) for the full theme gallery, masks, photographic controls and editable generated prompts. Return to Quick Generate with `Ctrl+1`.
 
 ## V0.4 Portrait Studio
 
