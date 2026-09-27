@@ -55,7 +55,7 @@ Background transformations generate the new scene and then composite the origina
 
 ### Reference Identity Lock
 
-Complete redesign, outfit, lighting and professional portrait modes use the source photograph as the image-to-image reference with strong identity instructions and conservative transformation strength controls.
+Complete redesign, outfit, lighting and professional portrait modes add **Exact Face Lock** on top of the source image-to-image reference. CineStills detects the primary frontal face locally, generates the redesign, and then restores the identity-bearing source face pixels through a soft oval blend. If no clear face is detected, generation stops instead of silently risking a different identity.
 
 ### Painted edit area
 
@@ -92,7 +92,7 @@ If dependencies change, `start.cmd` routes back through setup automatically.
 
 ## Current quality boundary
 
-Strict background replacement can retain the original person pixel-for-pixel. Generative full redesigns cannot honestly guarantee mathematically identical facial pixels with the current SDXL image-to-image pipeline. V0.4 reduces drift through the source reference, conservative strength and protected identity instructions. Stronger face-reference conditioning and automated face-similarity validation remain the next technical quality layer.
+Strict background replacement retains the original person pixel-for-pixel. Full redesigns now retain the central facial pixels with Exact Face Lock while allowing hair, clothing, lighting and surroundings to change. This works best with a clear frontal or near-frontal portrait and the original pose; it deliberately stops when a face cannot be detected. Large pose changes and profile faces still require a dedicated face-reference adapter plus similarity validation in a later model-layer upgrade.
 
 ## Architecture
 
