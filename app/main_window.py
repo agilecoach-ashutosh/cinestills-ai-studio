@@ -393,6 +393,9 @@ class MainWindow(QMainWindow):
         if preset.strict_composite:
             self.identity_badge.setText("STRICT IDENTITY LOCK\nThe original person is composited back pixel-for-pixel after generation.")
             self.identity_badge.setObjectName("identityStrict")
+        elif self._uses_exact_face_lock(preset):
+            self.identity_badge.setText("EXACT FACE LOCK\nOriginal face pixels are restored after generation. A clear frontal face and original pose are required.")
+            self.identity_badge.setObjectName("identityStrict")
         else:
             self.identity_badge.setText("REFERENCE IDENTITY LOCK\nThe face is protected while the selected parts are redesigned.")
             self.identity_badge.setObjectName("identityGenerative")
@@ -564,6 +567,15 @@ class MainWindow(QMainWindow):
     def _generation_strength(self) -> float:
         return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.intensity.currentText()]
 
+    @staticmethod
+    def _uses_exact_face_lock(preset: StudioPreset) -> bool:
+        return preset.mode in {
+            "Complete Redesign",
+            "Change Outfit",
+            "Lighting & Mood",
+            "Professional Portrait",
+        }
+
     def generate_local(self) -> None:
         if not self.source_path:
             QMessageBox.information(self, "Upload a portrait", "Select a source portrait first.")
@@ -595,6 +607,7 @@ class MainWindow(QMainWindow):
             prompt=self.build_current_prompt(),
             base_url=self.invoke.base_url,
             strict_composite=preset.strict_composite,
+            exact_face_lock=self._uses_exact_face_lock(preset),
             edit_mask_path=self.mask_path,
             strength=self._generation_strength(),
         )
