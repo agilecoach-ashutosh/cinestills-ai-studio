@@ -335,7 +335,7 @@ class InvokeClient:
                 "type": "qwen_image_denoise",
                 "steps": max(1, steps),
                 "cfg_scale": max(1.0, cfg_scale),
-                "denoising_start": max(0.0, min(1.0, 1.0 - strength)),
+                "denoising_start": 0.0,
                 "denoising_end": 1.0,
                 "seed": random.randint(0, 2_147_483_647),
                 "width": max(16, round(width / 16) * 16),
