@@ -17,8 +17,8 @@ def prepare_working_image(
     working = image.copy()
     working.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
 
-    width = max(64, (working.width // 8) * 8)
-    height = max(64, (working.height // 8) * 8)
+    width = max(64, (working.width // 16) * 16)
+    height = max(64, (working.height // 16) * 16)
     if (width, height) != working.size:
         working = working.resize((width, height), Image.Resampling.LANCZOS)
 
