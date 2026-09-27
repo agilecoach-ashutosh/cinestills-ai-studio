@@ -11,13 +11,11 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
-    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -174,8 +172,8 @@ class MainWindow(QMainWindow):
         self.quick_strength = QComboBox()
         self.quick_strength.addItems(["Natural", "Creative", "Dramatic"])
         controls.addWidget(self.quick_strength)
-        self.quick_identity = QLabel("● EXACT FACE LOCK ON")
-        self.quick_identity.setObjectName("identityStrict")
+        self.quick_identity = QLabel("PROMPT SENT AS WRITTEN")
+        self.quick_identity.setObjectName("hint")
         controls.addWidget(self.quick_identity)
         controls.addStretch(1)
         self.quick_generate = QPushButton("Generate")
@@ -367,26 +365,6 @@ class MainWindow(QMainWindow):
         self.custom_instruction.textChanged.connect(self._settings_changed)
         layout.addWidget(self.custom_instruction)
 
-        locks = QGroupBox("Identity Lock")
-        lock_layout = QVBoxLayout(locks)
-        self.lock_face = QCheckBox("Preserve face and identity")
-        self.lock_hair = QCheckBox("Preserve hairstyle")
-        self.lock_body = QCheckBox("Preserve body proportions")
-        self.lock_pose = QCheckBox("Keep the original pose")
-        self.lock_clothing = QCheckBox("Keep the original outfit")
-        self.lock_skin = QCheckBox("Preserve natural skin tone")
-        for checkbox in (self.lock_face, self.lock_hair, self.lock_body, self.lock_pose, self.lock_clothing, self.lock_skin):
-            checkbox.setChecked(True)
-            checkbox.toggled.connect(self._settings_changed)
-            lock_layout.addWidget(checkbox)
-        self.lock_face.setEnabled(False)
-        layout.addWidget(locks)
-
-        self.identity_badge = QLabel("Identity Lock will be applied at generation.")
-        self.identity_badge.setWordWrap(True)
-        self.identity_badge.setObjectName("identityStrict")
-        layout.addWidget(self.identity_badge)
-
         prompt_header = QHBoxLayout()
         prompt_label = QLabel("GENERATED PROMPT · EDITABLE")
         prompt_label.setObjectName("sectionTitle")
@@ -402,7 +380,7 @@ class MainWindow(QMainWindow):
         self.prompt_editor.setMinimumHeight(230)
         self.prompt_editor.textChanged.connect(self._prompt_edited)
         layout.addWidget(self.prompt_editor)
-        protected_note = QLabel("You may edit the complete prompt. The current Identity Lock block is safely rebuilt when you generate.")
+        protected_note = QLabel("The prompt shown above is sent exactly as written. CineStills adds no hidden instructions.")
         protected_note.setObjectName("hint")
         protected_note.setWordWrap(True)
         layout.addWidget(protected_note)
@@ -426,7 +404,7 @@ class MainWindow(QMainWindow):
         actions = QHBoxLayout()
         self.status = QLabel("Upload a portrait to begin")
         self.status.setObjectName("status")
-        self.generate = QPushButton("Generate  •  Identity Lock On")
+        self.generate = QPushButton("Generate")
         self.generate.setObjectName("generateButton")
         self.generate.clicked.connect(self.generate_local)
         self.save = QPushButton("Save Result")
@@ -491,23 +469,6 @@ class MainWindow(QMainWindow):
         if not preset:
             return
 
-        changes = set(preset.changes)
-        self.lock_hair.setChecked("hair" not in changes)
-        self.lock_clothing.setChecked("outfit" not in changes)
-        self.lock_pose.setChecked(True)
-        if preset.strict_composite:
-            self.identity_badge.setText("STRICT IDENTITY LOCK\nThe original person is composited back pixel-for-pixel after generation.")
-            self.identity_badge.setObjectName("identityStrict")
-        elif self._uses_exact_face_lock(preset):
-            self.identity_badge.setText("EXACT FACE LOCK\nOriginal face pixels are restored after generation. A clear frontal face and original pose are required.")
-            self.identity_badge.setObjectName("identityStrict")
-        else:
-            self.identity_badge.setText("REFERENCE IDENTITY LOCK\nThe face is protected while the selected parts are redesigned.")
-            self.identity_badge.setObjectName("identityGenerative")
-        if preset.requires_mask:
-            self.identity_badge.setText(self.identity_badge.text() + "\nPaint the area to change for the safest result.")
-        self.identity_badge.style().unpolish(self.identity_badge)
-        self.identity_badge.style().polish(self.identity_badge)
         self.status.setText(f"Selected: {preset.name}")
         self._regenerate_prompt(force=True)
 
@@ -521,12 +482,12 @@ class MainWindow(QMainWindow):
 
     def _locks(self) -> SubjectLocks:
         return SubjectLocks(
-            face=True,
-            hair=self.lock_hair.isChecked(),
-            body=self.lock_body.isChecked(),
-            pose=self.lock_pose.isChecked(),
-            clothing=self.lock_clothing.isChecked(),
-            skin_tone=self.lock_skin.isChecked(),
+            face=False,
+            hair=False,
+            body=False,
+            pose=False,
+            clothing=False,
+            skin_tone=False,
         )
 
     def _look(self) -> LookSettings:
@@ -575,7 +536,7 @@ class MainWindow(QMainWindow):
 
     def copy_prompt(self) -> None:
         QApplication.clipboard().setText(self.build_current_prompt())
-        self.status.setText("Final prompt copied. Identity Lock included.")
+        self.status.setText("Prompt copied exactly as shown.")
 
     def previous_prompt(self) -> None:
         if not self.prompt_history:
@@ -679,15 +640,6 @@ class MainWindow(QMainWindow):
     def _quick_generation_strength(self) -> float:
         return {"Natural": 0.52, "Creative": 0.70, "Dramatic": 0.84}[self.quick_strength.currentText()]
 
-    @staticmethod
-    def _uses_exact_face_lock(preset: StudioPreset) -> bool:
-        return preset.mode in {
-            "Complete Redesign",
-            "Change Outfit",
-            "Lighting & Mood",
-            "Professional Portrait",
-        }
-
     def generate_local(self) -> None:
         if not self.source_path:
             QMessageBox.information(self, "Upload a portrait", "Select a source portrait first.")
@@ -719,7 +671,7 @@ class MainWindow(QMainWindow):
             prompt=self.build_current_prompt(),
             base_url=self.invoke.base_url,
             strict_composite=preset.strict_composite,
-            exact_face_lock=self._uses_exact_face_lock(preset),
+            exact_face_lock=False,
             edit_mask_path=self.mask_path,
             strength=self._generation_strength(),
         )
@@ -744,26 +696,18 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "InvokeAI is offline", "Start InvokeAI locally, then try again.\n\n" + health.detail)
             return
 
-        protected_prompt = (
-            creative_prompt
-            + "\n\n[IDENTITY LOCK - PROTECTED]\n"
-            + "Use the uploaded photograph as the primary identity reference. Preserve the same "
-            + "recognisable person, facial geometry, both eyes, nose, lips, jawline, expression and "
-            + "natural skin tone. Keep the original pose and camera angle. Do not create a different "
-            + "person, duplicate person, distorted anatomy, text or watermark.\n[/IDENTITY LOCK]"
-        )
         self.quick_generate.setEnabled(False)
         self.generate.setEnabled(False)
         self.quick_save.setEnabled(False)
         self.save.setEnabled(False)
         self.quick_preview.clear_image("Creating your image…")
-        self.quick_status.setText("Generating locally with Exact Face Lock…")
+        self.quick_status.setText("Generating locally from your prompt…")
         self.worker = GenerationWorker(
             source_path=self.source_path,
-            prompt=protected_prompt,
+            prompt=creative_prompt,
             base_url=self.invoke.base_url,
             strict_composite=False,
-            exact_face_lock=True,
+            exact_face_lock=False,
             strength=self._quick_generation_strength(),
         )
         self.worker.status.connect(self.quick_status.setText)
