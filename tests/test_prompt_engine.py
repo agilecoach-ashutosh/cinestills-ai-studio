@@ -3,7 +3,6 @@ import unittest
 from app.presets import PRESETS, StudioPreset, modes, presets_for
 from app.prompt_engine import (
     LookSettings,
-    PROTECTED_START,
     SubjectLocks,
     build_prompt,
     finalize_prompt,
@@ -30,7 +29,7 @@ class PromptEngineTests(unittest.TestCase):
             locks=SubjectLocks(face=True, hair=False, body=True, pose=True, clothing=False, skin_tone=True),
             look=LookSettings(lens="85mm", lighting="Golden Hour", depth="Shallow depth of field"),
         )
-        self.assertIn("facial identity", prompt)
+        self.assertNotIn("IDENTITY LOCK", prompt)
         self.assertIn("85mm lens look", prompt)
         self.assertIn("Golden Hour", prompt)
         self.assertIn("keep the result subtle", prompt)
@@ -63,13 +62,12 @@ class PromptEngineTests(unittest.TestCase):
         self.assertIn("light direction", prompt)
         self.assertIn("depth of field", prompt)
 
-    def test_user_edits_survive_while_identity_guard_is_rebuilt(self):
+    def test_user_edits_are_sent_without_hidden_prompt_content(self):
         preset = presets_for("Complete Redesign")[0]
         edited = "My own final creative direction without the generated guard."
         final = finalize_prompt(edited, preset)
-        self.assertIn(edited, final)
-        self.assertIn(PROTECTED_START, final)
-        self.assertIn("same recognisable person", final)
+        self.assertEqual(edited, final)
+        self.assertNotIn("IDENTITY LOCK", final)
 
 
 if __name__ == "__main__":
