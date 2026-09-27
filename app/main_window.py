@@ -611,6 +611,7 @@ class MainWindow(QMainWindow):
         if not dialog.save_mask(mask_path):
             QMessageBox.warning(self, "Mask not saved", "CineStills could not save the painted area.")
             return
+        self._remove_mask_file()
         self.mask_path = str(mask_path)
         self._update_mask_badge()
         self.status.setText("Painted edit area active.")
@@ -740,10 +741,27 @@ class MainWindow(QMainWindow):
         self.status.setText("Generation failed")
         self.quick_status.setText("Generation failed")
         self.check_invoke()
+        lower_message = message.lower()
+        if "out of memory" in lower_message or ("cuda" in lower_message and "memory" in lower_message):
+            guidance = (
+                "Qwen Image Edit Q8_0 is memory-heavy. If InvokeAI cannot offload it successfully, "
+                "install Qwen Image Edit 2511 (Q4_K_M) and remove Q8_0, then try again."
+            )
+        elif "disk space" in lower_message or "no space left" in lower_message:
+            guidance = "Free additional disk space on the drive used by InvokeAI, then retry."
+        elif "qwen" in lower_message and ("not found" in lower_message or "no source" in lower_message):
+            guidance = (
+                "Check InvokeAI Model Manager for Qwen Image Edit 2511, Qwen2.5-VL Encoder and Qwen Image VAE."
+            )
+        else:
+            guidance = (
+                "No reinstall is needed for an InvokeAI generation error. "
+                "Check that InvokeAI is running and the required Qwen models are installed."
+            )
         QMessageBox.critical(
             self,
             "Local generation failed",
-            message + "\n\nNo reinstall is needed for an InvokeAI generation error. Check that InvokeAI is running and the required Qwen models are installed.",
+            message + "\n\n" + guidance,
         )
 
     def save_result(self) -> None:
