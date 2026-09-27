@@ -93,12 +93,12 @@ No terminal commands are required.
 3. Run **`start.cmd`**.
 4. Upload a portrait and choose a look.
 
-If dependencies change, `start.cmd` routes back through setup automatically.
+If a required Python component is missing, `start.cmd` routes back through setup automatically.
 
 ## Requirements
 
 - Windows 10/11
-- Python 3.12 recommended
+- Python 3.12 or later
 - InvokeAI Community Edition running locally
 - InvokeAI with the **Qwen Image Edit 2511** bundle components installed:
   - Qwen Image Edit 2511 (Q8_0 recommended for quality, Q4_K_M supported as fallback)
