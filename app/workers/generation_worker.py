@@ -8,6 +8,7 @@ from PIL import Image, ImageOps
 from PySide6.QtCore import QThread, Signal
 
 from app.services.identity_guard import create_subject_mask, prepare_working_image
+from app.services.face_lock import preserve_original_face
 from app.services.invoke_client import InvokeClient
 from app.services.mask_ops import apply_edit_mask
 
@@ -23,14 +24,18 @@ class GenerationWorker(QThread):
         prompt: str,
         base_url: str,
         strict_composite: bool = True,
+        exact_face_lock: bool = False,
         edit_mask_path: str | None = None,
+        strength: float = 0.72,
     ) -> None:
         super().__init__()
         self.source_path = source_path
         self.prompt = prompt
         self.base_url = base_url
         self.strict_composite = strict_composite
+        self.exact_face_lock = exact_face_lock
         self.edit_mask_path = edit_mask_path
+        self.strength = strength
 
     def run(self) -> None:
         try:
@@ -54,6 +59,7 @@ class GenerationWorker(QThread):
                 prompt=self.prompt,
                 width=width,
                 height=height,
+                strength=self.strength,
             )
 
             original = ImageOps.exif_transpose(Image.open(self.source_path)).convert("RGB")
@@ -73,6 +79,9 @@ class GenerationWorker(QThread):
                 self.status.emit("Applying strict subject preservation...")
                 subject_mask = create_subject_mask(original)
                 edited = Image.composite(original, edited, subject_mask)
+            elif self.exact_face_lock:
+                self.status.emit("Applying Exact Face Lock...")
+                edited = preserve_original_face(original, edited)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             edited.save(output_path, "PNG")

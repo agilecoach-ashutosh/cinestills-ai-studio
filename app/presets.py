@@ -12,6 +12,10 @@ class StudioPreset:
     prompt: str
     strict_composite: bool = True
     tags: tuple[str, ...] = ()
+    summary: str = ""
+    changes: tuple[str, ...] = ()
+    requires_mask: bool = False
+    accent: str = "#D7FF00"
 
 
 PRESETS: tuple[StudioPreset, ...] = (
@@ -641,19 +645,221 @@ PRESETS: tuple[StudioPreset, ...] = (
         False,
         ("interior", "computer", "workstation"),
     ),
+
+    # Complete portrait redesigns. These intentionally change scene and styling.
+    StudioPreset(
+        "redesign-vintage-motorsport", "Vintage Motorsport", "Complete Redesign", "Retro & Vintage",
+        "Restyle the portrait as a polished mid-century motorsport editorial with a classic motorcycle, period-inspired wardrobe, warm neutral daylight, restrained pin-up influence and premium magazine composition.",
+        False, ("retro", "motorcycle", "editorial"), "Mid-century fashion and classic motorcycle editorial.",
+        ("outfit", "background", "props", "lighting"), False, "#E4B46A",
+    ),
+    StudioPreset(
+        "redesign-80s-bollywood", "80s Bollywood", "Complete Redesign", "Retro & Vintage",
+        "Reimagine the portrait as a glamorous 1980s Bollywood film still with era-appropriate Indian fashion, expressive cinematic lighting, rich film colour and an authentic period set.",
+        False, ("80s", "bollywood", "film"), "Colourful 1980s Indian cinema styling.",
+        ("outfit", "background", "hair", "lighting"), False, "#FF6F61",
+    ),
+    StudioPreset(
+        "redesign-royal-heritage", "Royal Heritage", "Complete Redesign", "Indian Heritage",
+        "Create a refined Indian royal portrait with heritage architecture, intricately styled traditional clothing, elegant jewellery, warm lamp light and dignified fine-art composition.",
+        False, ("royal", "heritage", "india"), "Regal Indian fine-art portrait.",
+        ("outfit", "background", "accessories", "lighting"), False, "#C9993A",
+    ),
+    StudioPreset(
+        "redesign-future-fashion", "Future Fashion", "Complete Redesign", "Modern & Futuristic",
+        "Create a sophisticated near-future fashion editorial with sculptural wardrobe, clean architectural forms, controlled cyan and amber accents and realistic high-end campaign lighting.",
+        False, ("future", "fashion", "editorial"), "Premium futuristic fashion campaign.",
+        ("outfit", "background", "lighting"), False, "#55D6E6",
+    ),
+    StudioPreset(
+        "redesign-dark-academia", "Dark Academia", "Complete Redesign", "Cinematic",
+        "Restyle the portrait in a dark-academia library with tailored vintage clothing, old books, dark wood, window light, subtle dust atmosphere and moody cinematic grading.",
+        False, ("library", "vintage", "moody"), "Moody literary portrait with vintage tailoring.",
+        ("outfit", "background", "props", "lighting"), False, "#8B6B4A",
+    ),
+    StudioPreset(
+        "redesign-hollywood", "Hollywood Editorial", "Complete Redesign", "Cinematic",
+        "Create a luxury Hollywood editorial portrait with immaculate styling, dramatic key light, subtle rim light, premium set design and restrained filmic colour.",
+        False, ("hollywood", "luxury", "editorial"), "Luxury celebrity-magazine treatment.",
+        ("outfit", "background", "lighting"), False, "#E5D7B8",
+    ),
+    StudioPreset(
+        "redesign-fantasy-warrior", "Fantasy Warrior", "Complete Redesign", "Fantasy",
+        "Transform the portrait into a photorealistic fantasy-warrior character with detailed practical costume, atmospheric landscape, cinematic rim light and believable materials rather than illustration.",
+        False, ("fantasy", "warrior", "cinematic"), "Photorealistic cinematic character portrait.",
+        ("outfit", "background", "props", "lighting"), False, "#7BA69A",
+    ),
+    StudioPreset(
+        "redesign-festive-lights", "Festive Lights", "Complete Redesign", "Festival",
+        "Create an elegant Indian festive portrait with refined traditional styling, marigold details, diyas, warm string-light bokeh and realistic celebratory ambience.",
+        False, ("festival", "diya", "indian"), "Warm, elegant Indian festive transformation.",
+        ("outfit", "background", "accessories", "lighting"), False, "#FF9F43",
+    ),
+
+    # Outfit transformations.
+    StudioPreset(
+        "outfit-executive-suit", "Executive Suit", "Change Outfit", "Professional",
+        "Replace only the clothing with a perfectly fitted premium executive suit, realistic fabric, seams, folds and source-matched light. Keep face, hair, body, hands, pose and background unchanged.",
+        False, ("suit", "executive", "formal"), "Premium business wardrobe.", ("outfit",), True, "#577590",
+    ),
+    StudioPreset(
+        "outfit-elegant-saree", "Elegant Saree", "Change Outfit", "Indian Traditional",
+        "Replace only the clothing with an elegant Indian saree draped naturally for the existing pose, realistic textile detail, folds and source-matched lighting. Preserve identity and anatomy.",
+        False, ("saree", "traditional", "india"), "Graceful saree with realistic draping.", ("outfit",), True, "#D66D75",
+    ),
+    StudioPreset(
+        "outfit-designer-lehenga", "Designer Lehenga", "Change Outfit", "Indian Traditional",
+        "Replace only the clothing with a refined designer lehenga, tasteful embroidery, realistic weight and folds, fitted to the existing body and pose with matching light and shadows.",
+        False, ("lehenga", "designer", "traditional"), "Detailed contemporary Indian occasion wear.", ("outfit",), True, "#B565A7",
+    ),
+    StudioPreset(
+        "outfit-evening-gown", "Evening Gown", "Change Outfit", "Fashion",
+        "Replace only the clothing with a sophisticated evening gown, realistic tailoring and flowing fabric, respecting the existing body, pose, hands, perspective and scene lighting.",
+        False, ("gown", "fashion", "evening"), "Sophisticated full-length fashion styling.", ("outfit",), True, "#6C5B7B",
+    ),
+    StudioPreset(
+        "outfit-smart-casual", "Smart Casual", "Change Outfit", "Everyday",
+        "Replace only the clothing with polished smart-casual styling, natural fit, realistic fabric texture and source-matched light while retaining all other image content.",
+        False, ("casual", "modern", "lifestyle"), "Modern, approachable everyday styling.", ("outfit",), True, "#4D908E",
+    ),
+    StudioPreset(
+        "outfit-streetwear", "Editorial Streetwear", "Change Outfit", "Fashion",
+        "Replace only the clothing with premium contemporary streetwear, layered styling, realistic fabric and fit, while preserving identity, pose, body shape, hands and background.",
+        False, ("streetwear", "editorial", "fashion"), "Bold contemporary fashion layers.", ("outfit",), True, "#F9844A",
+    ),
+
+    # Lighting and mood.
+    StudioPreset(
+        "light-golden-hour", "Golden Hour", "Lighting & Mood", "Natural Light",
+        "Relight the photograph with warm low golden-hour sunlight, soft directional highlights, believable shadow direction and subtle atmospheric warmth without changing identity or scene content.",
+        False, ("golden-hour", "warm", "natural"), "Warm sunset-quality portrait light.", ("lighting", "colour"), False, "#F9C74F",
+    ),
+    StudioPreset(
+        "light-soft-window", "Soft Window Light", "Lighting & Mood", "Natural Light",
+        "Relight the portrait with large soft window light, gentle facial modelling, controlled highlights and natural shadow falloff while preserving all features and image content.",
+        False, ("window", "soft", "portrait"), "Flattering natural window illumination.", ("lighting",), False, "#BDE0FE",
+    ),
+    StudioPreset(
+        "light-low-key", "Low-Key Drama", "Lighting & Mood", "Studio Light",
+        "Create a professional low-key portrait treatment with controlled dramatic key light, deep clean shadows and a subtle rim highlight while keeping facial identity and texture natural.",
+        False, ("low-key", "dramatic", "studio"), "Dark, sculpted professional lighting.", ("lighting", "colour"), False, "#6D6875",
+    ),
+    StudioPreset(
+        "light-neon", "Cinematic Neon", "Lighting & Mood", "Creative Light",
+        "Relight the portrait with restrained cinematic cyan and magenta practical light, realistic colour spill and dimensional shadows without changing the person's features.",
+        False, ("neon", "cinematic", "colour"), "Controlled cyan-magenta cinematic mood.", ("lighting", "colour"), False, "#B5179E",
+    ),
+    StudioPreset(
+        "light-dreamy", "Dreamy Pastel", "Lighting & Mood", "Creative Light",
+        "Create soft dreamy portrait lighting with delicate pastel highlights, airy contrast, natural skin and subtle glow while maintaining realistic detail and identity.",
+        False, ("dreamy", "pastel", "soft"), "Airy pastel light with natural skin.", ("lighting", "colour"), False, "#F7CAD0",
+    ),
+
+    # Professional portrait outcomes.
+    StudioPreset(
+        "portrait-linkedin", "LinkedIn Headshot", "Professional Portrait", "Business",
+        "Create a credible modern LinkedIn headshot with clean neutral background, flattering soft studio light, professional framing and authentic natural expression. Preserve identity exactly.",
+        False, ("linkedin", "headshot", "business"), "Clean and approachable professional headshot.", ("background", "lighting", "crop"), False, "#4EA8DE",
+    ),
+    StudioPreset(
+        "portrait-executive", "Executive Portrait", "Professional Portrait", "Business",
+        "Create a premium executive portrait with confident composition, sophisticated dark-neutral environment, tailored professional styling and controlled editorial lighting.",
+        False, ("executive", "leadership", "portrait"), "Leadership portrait with premium gravitas.", ("outfit", "background", "lighting"), False, "#4361EE",
+    ),
+    StudioPreset(
+        "portrait-actor", "Actor Portfolio", "Professional Portrait", "Creative Portfolio",
+        "Create a natural actor portfolio portrait with expressive eyes, authentic skin texture, simple wardrobe, uncluttered background and cinematic yet believable light.",
+        False, ("actor", "portfolio", "natural"), "Expressive casting-style portfolio portrait.", ("background", "lighting", "crop"), False, "#90BE6D",
+    ),
+    StudioPreset(
+        "portrait-fashion", "Fashion Editorial", "Professional Portrait", "Creative Portfolio",
+        "Create a high-end fashion editorial portrait with refined styling, intentional composition, premium studio lighting, natural skin texture and magazine-quality colour.",
+        False, ("fashion", "editorial", "magazine"), "High-fashion magazine finish.", ("outfit", "background", "lighting"), False, "#F94144",
+    ),
+    StudioPreset(
+        "portrait-studio-classic", "Classic Studio", "Professional Portrait", "Studio",
+        "Create a timeless studio portrait with a seamless neutral backdrop, soft key and fill light, subtle separation light and clean professional colour.",
+        False, ("classic", "studio", "timeless"), "Timeless neutral studio portrait.", ("background", "lighting"), False, "#ADB5BD",
+    ),
+
+    # Professional skin retouching. These are intentionally conservative.
+    StudioPreset(
+        "retouch-natural", "Natural Cleanup", "Professional Skin Retouching", "Skin Finish",
+        "Perform subtle professional skin cleanup: remove only temporary blemishes and minor distractions, gently balance uneven tone, control shine and preserve pores, fine texture, permanent features and natural complexion.",
+        False, ("skin", "natural", "retouch"), "Invisible cleanup with real skin texture.", ("skin",), True, "#F6BD60",
+    ),
+    StudioPreset(
+        "retouch-polished", "Polished Portrait", "Professional Skin Retouching", "Skin Finish",
+        "Apply polished professional portrait retouching with restrained blemish cleanup, balanced tone, softened temporary under-eye darkness and controlled highlights while retaining pores and facial structure.",
+        False, ("skin", "polished", "portrait"), "Refined finish without plastic smoothing.", ("skin",), True, "#F5CAC3",
+    ),
+    StudioPreset(
+        "retouch-editorial", "Editorial Beauty", "Professional Skin Retouching", "Skin Finish",
+        "Apply high-end editorial beauty retouching using realistic frequency-separation aesthetics, even tonal transitions and precise highlight control while preserving pores, complexion and distinctive permanent features.",
+        False, ("beauty", "editorial", "skin"), "High-end beauty finish with authentic texture.", ("skin",), True, "#E8A598",
+    ),
+    StudioPreset(
+        "retouch-under-eye", "Under-Eye Balance", "Professional Skin Retouching", "Targeted",
+        "Reduce only temporary under-eye darkness and puffiness with natural tonal blending. Preserve eye shape, expression, eyelashes, fine lines and facial identity.",
+        False, ("under-eye", "targeted", "natural"), "Gentle, targeted under-eye correction.", ("skin",), True, "#DDBEA9",
+    ),
+    StudioPreset(
+        "retouch-shine", "Reduce Shine", "Professional Skin Retouching", "Targeted",
+        "Reduce distracting facial shine while retaining healthy natural highlights, skin texture, pores, complexion and the original lighting direction.",
+        False, ("shine", "skin", "targeted"), "Controlled highlights without flattening skin.", ("skin",), True, "#FFE5D9",
+    ),
+
+    # Enhancement and restoration.
+    StudioPreset(
+        "enhance-detail", "Improve Clarity", "Enhance & Restore", "Enhance",
+        "Improve photographic clarity, fine detail, micro-contrast and exposure balance conservatively. Do not change identity, expression, facial features or introduce invented details.",
+        False, ("clarity", "detail", "enhance"), "Natural clarity and exposure improvement.", ("detail", "exposure"), False, "#43AA8B",
+    ),
+    StudioPreset(
+        "enhance-low-light", "Low-Light Rescue", "Enhance & Restore", "Enhance",
+        "Recover a low-light portrait by reducing noise, restoring natural colour, balancing exposure and improving usable detail without over-sharpening or changing the person.",
+        False, ("low-light", "noise", "restore"), "Cleaner, naturally exposed night photo.", ("detail", "exposure", "colour"), False, "#277DA1",
+    ),
+    StudioPreset(
+        "restore-old-photo", "Restore Old Photo", "Enhance & Restore", "Restore",
+        "Restore the damaged photograph by repairing scratches, dust, fading and small missing areas while preserving every person's identity, age, expression and authentic photographic character.",
+        False, ("old-photo", "repair", "restore"), "Repair age damage without rewriting history.", ("damage", "detail", "exposure"), False, "#9C755F",
+    ),
+    StudioPreset(
+        "restore-colourise", "Natural Colourisation", "Enhance & Restore", "Restore",
+        "Colourise the black-and-white photograph with historically plausible, restrained natural colours, believable skin tones and fabric colours while preserving original contrast and identity.",
+        False, ("colourise", "restore", "old-photo"), "Historically restrained natural colour.", ("colour",), False, "#84A59D",
+    ),
 )
 
 
+PRIMARY_MODES: tuple[str, ...] = (
+    "Change Background",
+    "Complete Redesign",
+    "Change Outfit",
+    "Lighting & Mood",
+    "Professional Portrait",
+    "Professional Skin Retouching",
+    "Enhance & Restore",
+)
+
+
+def _internal_mode(mode: str) -> str:
+    return "Background" if mode == "Change Background" else mode
+
+
 def modes() -> list[str]:
-    return list(dict.fromkeys(p.mode for p in PRESETS))
+    return list(PRIMARY_MODES)
 
 
 def categories_for_mode(mode: str) -> list[str]:
-    return list(dict.fromkeys(p.category for p in PRESETS if p.mode == mode))
+    internal = _internal_mode(mode)
+    return list(dict.fromkeys(p.category for p in PRESETS if p.mode == internal))
 
 
 def presets_for(mode: str, category: str | None = None) -> list[StudioPreset]:
+    internal = _internal_mode(mode)
     return [
         p for p in PRESETS
-        if p.mode == mode and (category is None or p.category == category)
+        if p.mode == internal and (category is None or p.category == category)
     ]
