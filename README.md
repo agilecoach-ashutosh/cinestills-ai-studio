@@ -1,5 +1,10 @@
 # CineStills AI Studio
 
+> [!IMPORTANT]
+> **Project status: Discontinued**
+>
+> Development of CineStills AI Studio was stopped on **27 September 2026**. The local prompt-based image-editing results did not meet the quality bar intended for the product, particularly for reliable identity-preserving transformations. This repository is retained as a technical reference and experiment archive. No active development, support, or further releases are planned.
+
 **Upload. Describe. Generate.**
 
 CineStills AI Studio is a local-first portrait transformation application for photographers and everyday users. Its default Quick Generate workspace needs only a photo and a plain-language prompt. The complete theme-based workflow remains available under **Workspace → Portrait Studio**.
@@ -133,13 +138,9 @@ Portrait upload
       +--> Compare and save
 ```
 
-## Next quality milestones
+## Archived project
 
-- Original photographic preview artwork for every theme card
-- Native InvokeAI inpainting instead of output-only mask compositing
-- Automated identity-similarity checks and retry for major restyles
-- Four-result contact sheet and before/after slider
-- Favourites and full personal-preset gallery
+The repository remains available to preserve the desktop UI, prompt library, local masking and identity-preservation experiments, InvokeAI integration work, tests, and installer patterns developed during the prototype.
 
 ## Project philosophy
 
